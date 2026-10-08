@@ -110,6 +110,16 @@ class ProductionQueueUiTest {
             compose.onNodeWithTag("product-note-long-${line.name}").performScrollTo().assertTextEquals(fullText)
             compose.onNodeWithText("Anuluj").performClick()
             if (line == ProductionLine.BUTTER) screenshot("zamowienie-dwa-slowa-notatki")
+            val order = compose.runOnIdle { model.state.value.entries.single { it.id == id } }
+            compose.runOnIdle { model.schedule(order, today, java.time.LocalTime.MIDNIGHT) }
+            compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && !model.state.value.entries.single { it.id == id }.pendingOrder } }
+            compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-$id"))
+            compose.onNodeWithTag("queue-note-preview-$id", useUnmergedTree = true).assertTextEquals("Pilna partia do realizacji jutro rano")
+            val inProduction = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
+            assertEquals(before.width, inProduction.width, .1f); assertEquals(before.height, inProduction.height, .1f)
+            compose.activityRule.scenario.recreate()
+            val rotated = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
+            assertEquals(inProduction.height, rotated.height, .1f)
             compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
         }
     }
@@ -213,7 +223,7 @@ class ProductionQueueUiTest {
         compose.onNodeWithTag("queue-down-$c").performClick()
         compose.waitUntil(timeoutMillis = 10000) { dailyTitles() == listOf("A", "C", "B") }
         compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-day-$today"))
-        compose.onNodeWithText("1. A").performClick()
+        compose.onNodeWithText("1. A").performScrollTo().performClick()
         compose.onNodeWithText("Produkcja / produkt").performTextClearance()
         compose.onNodeWithText("Produkcja / produkt").performTextInput("A poprawione")
         compose.onNodeWithText("Plan / uwagi").performTextClearance()
@@ -226,7 +236,7 @@ class ProductionQueueUiTest {
         }
         screenshot("kolejka-produkcji-kolejnosc")
         val otherDate = today.withDayOfMonth(if (today.dayOfMonth == 15) 16 else 15)
-        compose.onNodeWithText("1. A poprawione").performClick()
+        compose.onNodeWithText("1. A poprawione").performScrollTo().performClick()
         compose.onNodeWithTag("queue-editor-date").performClick()
         chooseCalendarDay(otherDate)
         compose.onNodeWithText("Zmiana daty przeniesie pozycję na koniec kolejki wybranego dnia.").assertExists()
@@ -247,6 +257,7 @@ class ProductionQueueUiTest {
         compose.onNodeWithText("Anuluj").performClick()
         compose.onNodeWithText("1. A poprawione").assertExists()
         compose.onNodeWithContentDescription("Usuń produkcję: A poprawione").performClick()
+        compose.onNodeWithTag("queue-delete-pin").performTextInput("5522")
         compose.onNodeWithText("Usuń").performClick()
         compose.waitUntil(timeoutMillis = 10000) { dailyTitles(otherDate).isEmpty() }
         compose.onNodeWithText("Brak produkcji na ten dzień").assertExists()
@@ -256,6 +267,54 @@ class ProductionQueueUiTest {
             try { org.junit.Assert.assertEquals(listOf("C", "B"), repository.load().map { it.title }) } finally { repository.close() }
         }
     }
+    @Test fun productionCodesAndDeletionPinsWorkInAllLines() {
+        ProductionQueueRepository(model.getApplication()).useForTest { repo ->
+            ProductionLine.entries.forEach { line -> repo.save("code-${line.name}", line, today, "Partia ${line.title}", "Materiały do przygotowania", 1L,
+                java.math.BigDecimal("1000"), pendingOrder = false) }
+        }
+        compose.runOnIdle { model.reload() }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading } }
+        openQueue()
+        listOf("butter" to ProductionLine.BUTTER, "powder" to ProductionLine.POWDER, "uht" to ProductionLine.UHT).forEach { (route, line) ->
+            val id = "code-${line.name}"
+            compose.onNodeWithTag("production-queue_$route").performClick()
+            compose.onNodeWithTag("queue-code-$id").performScrollTo().performClick()
+            compose.onNodeWithTag("production-code-input").performTextInput("07")
+            compose.onNodeWithTag("production-code-save").assertIsNotEnabled()
+            compose.onNodeWithTag("production-code-input").performTextInput("7")
+            compose.onNodeWithTag("production-code-save").performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
+            compose.onNodeWithTag("queue-note-preview-$id", true).assertTextEquals("Materiały do przygotowania")
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
+            val beforeDelete = compose.runOnIdle { model.state.value.entries.size }
+            compose.onNodeWithContentDescription("Usuń produkcję: Partia ${line.title}").performScrollTo().performClick()
+            compose.onNodeWithTag("queue-delete-confirm").assertIsNotEnabled()
+            compose.onNodeWithTag("queue-delete-pin").performTextInput("1111")
+            compose.onNodeWithTag("queue-delete-confirm").performClick()
+            compose.onNodeWithText("Nieprawidłowy PIN.").assertExists()
+            compose.runOnIdle { assertEquals(beforeDelete, model.state.value.entries.size) }
+            compose.onNodeWithText("Anuluj").performClick()
+            compose.onNodeWithTag("queue-return-$id").performScrollTo().performClick()
+            compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.single { it.id == id }.pendingOrder } }
+            compose.onNodeWithTag("queue-code-$id").assert(hasText("077")).performClick()
+            compose.onNodeWithTag("production-code-input").performTextClearance()
+            compose.onNodeWithTag("production-code-save").performClick()
+            compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("queue-code-$id").assert(hasText("Kod"))
+            compose.onNodeWithContentDescription("Usuń produkcję: Partia ${line.title}").performClick()
+            compose.onNodeWithTag("queue-delete-pin").performTextInput("5522")
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithTag("queue-delete-confirm").assertIsNotEnabled()
+            compose.onNodeWithTag("queue-delete-pin").performTextInput("5522")
+            compose.onNodeWithTag("queue-delete-confirm").performClick()
+            compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.none { it.id == id } } }
+            compose.onNodeWithTag("queue-entry-$id").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
+        }
+    }
+
     @Test fun ordersCanBeDraggedIntoAConcreteDayAndHourInEveryLineAndRescheduledWithoutDuplicates() {
         openQueue()
         listOf("butter" to "Masłownia", "powder" to "Proszkownia", "uht" to "UHT").forEach { (route, title) ->

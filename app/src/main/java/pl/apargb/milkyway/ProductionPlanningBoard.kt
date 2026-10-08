@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -62,6 +63,10 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
     var completionId by rememberSaveable { mutableStateOf<String?>(null) }
     var notesId by rememberSaveable { mutableStateOf<String?>(null) }
     var deletingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var codeId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(ui.entries, deletingId) {
+        if (!ui.loading && !ui.saving && deletingId != null && ui.entries.none { it.id == deletingId }) deletingId = null
+    }
     val date = LocalDate.parse(selectedDate)
     val enabled = !ui.loading && !ui.saving && ui.loadError == null
     val activeByDay = ui.entries.filter { it.line == line && !it.pendingOrder && !it.completed }
@@ -269,11 +274,11 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                     if (untimed.isNotEmpty()) Text("Bez godziny", Modifier.padding(4.dp), style = MaterialTheme.typography.labelMedium)
                                     untimed.forEach { entry -> key(entry.id) {
                                         PlanningCard(entry, "${entries.indexOf(entry) + 1}. ${entry.title}", enabled,
-                                            { edit(entry) }, { completionId = entry.id; model.clearError() }, { deletingId = entry.id },
+                                            { edit(entry) }, { completionId = entry.id; model.clearError() }, { model.clearError(); deletingId = entry.id },
                                             { model.move(entry, -1) }, { model.move(entry, 1) }, untimed.indexOf(entry) > 0,
                                             untimed.indexOf(entry) < untimed.lastIndex, { edit(entry, true) }, startDrag, dragBy, finishDrag, { dragged = null },
-                                            { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id },
-                                            { model.returnToPending(entry) })
+                                            { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
+                                            { model.returnToPending(entry) }, productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                                     } }
                                 }
                             } else {
@@ -285,19 +290,19 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                     .onGloballyPositioned { hourBounds[slot] = it.boundsInRoot() }, shape = RoundedCornerShape(12.dp),
                                     color = if (highlighted == slot) line.tone.accent.copy(alpha = .18f) else dayBackground,
                                     border = if (highlighted == slot) BorderStroke(2.dp, line.tone.accent) else null) {
-                                    Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text("%02d:00–%02d:00".format(hour, hour + 2), style = MaterialTheme.typography.labelSmall, color = line.tone.accent)
+                                    Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("%02d:00–%02d:00".format(hour, hour + 2), Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall, color = line.tone.accent)
                                         if (scheduled.isEmpty()) Text(if (highlighted == slot) "Upuść tutaj" else "—",
                                             Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         scheduled.forEach { entry -> key(entry.id) {
                                             val group = scheduled.filter { it.scheduledTime == entry.scheduledTime }
                                             PlanningCard(entry, "${entries.indexOf(entry) + 1}. ${entry.title}", enabled,
-                                                { edit(entry) }, { completionId = entry.id; model.clearError() }, { deletingId = entry.id },
+                                                { edit(entry) }, { completionId = entry.id; model.clearError() }, { model.clearError(); deletingId = entry.id },
                                                 { model.move(entry, -1) }, { model.move(entry, 1) }, group.indexOf(entry) > 0,
                                                 group.indexOf(entry) < group.lastIndex, { edit(entry, true) }, startDrag, dragBy, finishDrag, { dragged = null },
-                                                { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id },
-                                                { model.returnToPending(entry) })
+                                                { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
+                                                { model.returnToPending(entry) }, productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                                         } }
                                     }
                                 }
@@ -320,10 +325,10 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         items(orders, key = { it.id }) { entry ->
-                            PlanningCard(entry, entry.title, enabled, { edit(entry) }, {}, { deletingId = entry.id }, {}, {}, false, false,
+                            PlanningCard(entry, entry.title, enabled, { edit(entry) }, {}, { model.clearError(); deletingId = entry.id }, {}, {}, false, false,
                                 { edit(entry, true) }, startDrag, dragBy, finishDrag, { dragged = null },
-                                { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id },
-                                { model.returnToPending(entry) })
+                                { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
+                                { model.returnToPending(entry) }, productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                         }
                     }
                 }
@@ -370,12 +375,14 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
         ProductNotesDialog(entry, if (entry.pendingOrder) ProductNoteStage.ORDER else ProductNoteStage.PRODUCTION,
             ui, model, onClose = { notesId = null })
     } }
-    ui.entries.find { it.id == deletingId }?.let { entry ->
-        AlertDialog(onDismissRequest = { deletingId = null }, title = { Text("Usunąć pozycję?") },
-            text = { Text(entry.title + "\nUsunięcie obejmuje również notatki tego produktu.") },
-            confirmButton = { TextButton(onClick = { model.delete(entry); deletingId = null }, enabled = !ui.saving) { Text("Usuń") } },
-            dismissButton = { TextButton(onClick = { deletingId = null }) { Text("Anuluj") } })
-    }
+    ui.entries.find { it.id == codeId }?.let { entry -> key(entry.id) {
+        ProductionCodeDialog(entry, ui, model, onClose = { codeId = null })
+    } }
+    ui.entries.find { it.id == deletingId }?.let { entry -> key(entry.id) {
+        WarehouseDeleteDialog("Usunąć pozycję?", entry.title + "\nUsunięcie obejmuje również notatki tego produktu.",
+            saving = ui.saving, error = ui.operationError, confirmTag = "queue-delete-confirm", pinTag = "queue-delete-pin",
+            onDelete = { model.delete(entry, it) }, onClose = { deletingId = null; model.clearError() })
+    } }
 }
 
 @Composable
@@ -383,15 +390,20 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                          onComplete: () -> Unit, onDelete: () -> Unit, onUp: () -> Unit, onDown: () -> Unit,
                          canUp: Boolean, canDown: Boolean, onSchedule: () -> Unit,
                          onDragStart: (ProductionQueueEntry, Offset) -> Unit, onDrag: (Offset) -> Unit,
-                         onDragEnd: () -> Unit, onDragCancel: () -> Unit, onNotes: () -> Unit, latestNote: ProductNote?, onReturnToPending: () -> Unit) {
+                         onDragEnd: () -> Unit, onDragCancel: () -> Unit, onNotes: () -> Unit, latestNote: ProductNote?,
+                         onReturnToPending: () -> Unit, code: String, onCode: () -> Unit) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val start by rememberUpdatedState(onDragStart)
     val drag by rememberUpdatedState(onDrag)
     val end by rememberUpdatedState(onDragEnd)
     val cancel by rememberUpdatedState(onDragCancel)
     val currentEntry by rememberUpdatedState(entry)
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val background = productionCardBackground(entry.id)
+    val note = latestNote?.text?.takeIf { it.isNotBlank() } ?: entry.description
+    val preview = if (entry.pendingOrder) orderNotePreview(note) else note.trim().replace(Regex("[\\s\\u00a0]+"), " ")
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 32.dp) {
-    Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().testTag("queue-entry-${entry.id}")
+    Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(256.dp * fontScale).testTag("queue-entry-${entry.id}")
         .onGloballyPositioned { bounds = it.boundsInRoot() }
         .pointerInput(entry.id, enabled) {
             if (enabled) awaitEachGesture {
@@ -414,10 +426,10 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     } finally { if (!finished) cancel() }
                 }
             }
-        }, color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp),
+        }, color = background, shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .22f))) {
-        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(Modifier.fillMaxWidth().height(40.dp * fontScale), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, modifier = Modifier.weight(1f).testTag("queue-edit-${entry.id}")
                     .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
                     style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 2,
@@ -426,38 +438,44 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
                 }
             }
-            latestNote?.let { Text(if (entry.pendingOrder) orderNotePreview(it.text) else it.text,
-                modifier = Modifier.testTag("queue-note-preview-${entry.id}"), style = MaterialTheme.typography.labelSmall, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(preview.ifBlank { "—" },
+                modifier = Modifier.height(32.dp * fontScale).testTag("queue-note-preview-${entry.id}"),
+                style = MaterialTheme.typography.labelSmall, maxLines = if (entry.pendingOrder) 1 else 2,
+                minLines = if (entry.pendingOrder) 1 else 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth().height(32.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${entry.remainingAmount?.let(::decimalLabel) ?: "—"} ${entry.unit.label}" +
-                (entry.scheduledTime?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall)
-            if (entry.pendingOrder && entry.producedAmount.signum() > 0) {
-                Text("Oczekuje: ${entry.remainingAmount?.let(::decimalLabel) ?: "—"} ${entry.unit.label}",
-                    Modifier.testTag("queue-pending-remaining-${entry.id}"), style = MaterialTheme.typography.labelSmall,
-                    color = entry.line.tone.accent)
-                Text("Już wyprodukowano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}", style = MaterialTheme.typography.labelSmall)
+                (entry.scheduledTime?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(58.dp).height(32.dp).testTag("queue-code-${entry.id}"),
+                shape = RoundedCornerShape(6.dp), contentPadding = PaddingValues(0.dp)) {
+                Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelMedium)
             }
-            if (!entry.pendingOrder) {
-                Text(entry.remainingAmount?.let { "Pozostało: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
-                    Modifier.testTag("queue-remaining-${entry.id}"), style = MaterialTheme.typography.labelSmall,
-                    color = if (entry.remainingAmount?.signum() == 0) EmptyTankColor else entry.line.tone.accent)
-                if (entry.remainingAmount?.signum() == 0) Text("Wyprodukowano w całości", style = MaterialTheme.typography.labelSmall, color = EmptyTankColor)
-                if (entry.date == LocalDate.now()) OutlinedButton(onClick = onComplete,
+            }
+            Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
+                Modifier.testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
+                style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
+            Box(Modifier.fillMaxWidth().height(16.dp * fontScale)) {
+                if (entry.producedAmount.signum() > 0) Text("Już wyprodukowano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}",
+                    style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (!entry.pendingOrder && entry.date == LocalDate.now()) {
+                OutlinedButton(onClick = onComplete,
                     enabled = enabled && entry.remainingAmount?.signum() == 1,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp).testTag("queue-produced-${entry.id}"),
+                    modifier = Modifier.fillMaxWidth().height(32.dp).testTag("queue-produced-${entry.id}"),
                     contentPadding = PaddingValues(2.dp)) { Text("Wyprodukowano", style = MaterialTheme.typography.labelSmall) }
-                TextButton(onClick = onReturnToPending, enabled = enabled, modifier = Modifier.fillMaxWidth()
-                    .testTag("queue-return-${entry.id}"), contentPadding = PaddingValues(2.dp)) {
-                    Icon(Icons.Outlined.MoveToInbox, "Przenieś do oczekujących", Modifier.size(16.dp))
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            } else Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().height(32.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 if (!entry.pendingOrder) {
-                    IconButton(onClick = onUp, enabled = enabled && canUp, modifier = Modifier.size(36.dp).testTag("queue-up-${entry.id}")) {
+                    IconButton(onClick = onUp, enabled = enabled && canUp, modifier = Modifier.size(32.dp).testTag("queue-up-${entry.id}")) {
                         Icon(Icons.Outlined.ArrowUpward, "Przesuń wyżej: ${entry.title}", Modifier.size(16.dp))
                     }
-                    IconButton(onClick = onDown, enabled = enabled && canDown, modifier = Modifier.size(36.dp).testTag("queue-down-${entry.id}")) {
+                    IconButton(onClick = onDown, enabled = enabled && canDown, modifier = Modifier.size(32.dp).testTag("queue-down-${entry.id}")) {
                         Icon(Icons.Outlined.ArrowDownward, "Przesuń niżej: ${entry.title}", Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onReturnToPending, enabled = enabled, modifier = Modifier.size(32.dp).testTag("queue-return-${entry.id}")) {
+                        Icon(Icons.Outlined.MoveToInbox, "Przenieś do oczekujących", Modifier.size(16.dp))
                     }
                 } else {
                     Icon(Icons.Outlined.DragIndicator, "Przytrzymaj, aby przenieść: ${entry.title}", Modifier.size(14.dp),
@@ -467,7 +485,7 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                         Text("Zaplanuj", style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                if (entry.producedAmount.signum() == 0) IconButton(onClick = onDelete, enabled = enabled, modifier = Modifier.size(36.dp)) {
+                if (entry.producedAmount.signum() == 0) IconButton(onClick = onDelete, enabled = enabled, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Outlined.DeleteOutline, "Usuń produkcję: ${entry.title}", Modifier.size(16.dp))
                 }
             }
@@ -475,6 +493,8 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
     }
     }
 }
+
+internal fun productionCardBackground(id: String): Color = Color.hsv(Math.floorMod(id.hashCode(), 360).toFloat(), .13f, .99f)
 
 internal data class ProductionPlanSlot(val date: LocalDate, val hour: Int)
 internal fun orderNotePreview(text: String): String = text.trim().split(Regex("[\\s\\u00a0]+"))

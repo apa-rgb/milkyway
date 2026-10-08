@@ -37,6 +37,34 @@ class ProductionQueueRepositoryTest {
     private fun ids(date: LocalDate = today, line: ProductionLine = ProductionLine.BUTTER) =
         repository.load().filter { it.line == line && it.date == date }.map { it.id }
 
+    @Test fun optionalProductionCodesPreserveZerosSurviveReopeningAndDeletionRejectsWrongPin() {
+        repository.save("coded", ProductionLine.BUTTER, today, "Partia", "Opis", 100L, BigDecimal("1000"))
+        val entry = repository.load().single()
+        val original = repository.snapshot()
+        listOf("12", "1234", "7a7", " 007").forEach { code ->
+            assertThrows(IllegalArgumentException::class.java) { repository.setProductionCode("bad-$code", entry, code, 1000L) }
+            assertEquals(original, repository.snapshot())
+        }
+        repository.setProductionCode("code", entry, "007", 1000L)
+        repository.setProductionCode("code", entry, "007", 1000L)
+        assertEquals(1, repository.snapshot().productNotes.size)
+        repository.close()
+        database = ProductionQueueDatabase(context)
+        repository = ProductionQueueRepository(context, database, today = { today })
+        assertEquals("007", productionCode(repository.snapshot().productNotes, entry.id))
+        assertEquals(entry, repository.load().single())
+        repository.setProductionCode("clear-code", entry, "", 1000L)
+        assertEquals("", productionCode(repository.snapshot().productNotes, entry.id))
+        val beforeDelete = repository.snapshot()
+        listOf("", "1111", "552", "55222").forEach { pin ->
+            assertThrows(IllegalArgumentException::class.java) { repository.delete(entry, pin) }
+            assertEquals(beforeDelete, repository.snapshot())
+        }
+        repository.delete(entry, "5522")
+        assertTrue(repository.snapshot().entries.isEmpty())
+        assertTrue(repository.snapshot().productNotes.isEmpty())
+    }
+
     @Test fun plansAreSeparatedByDayAndLineAndSurviveReopening() {
         save("butter-today")
         save("butter-tomorrow", tomorrow)
@@ -72,7 +100,7 @@ class ProductionQueueRepositoryTest {
     @Test fun movingUsesCurrentOrderHandlesGapsAndBoundariesAndDoesNotChangeOtherPlans() {
         listOf("a", "b", "c", "d").forEach { save(it) }
         save("tomorrow", tomorrow); save("powder", line = ProductionLine.POWDER)
-        repository.delete(repository.load().single { it.id == "b" })
+        repository.delete(repository.load().single { it.id == "b" }, "5522")
         repository.move("d", ProductionLine.BUTTER, today, -1, 200L)
         repository.move("d", ProductionLine.BUTTER, today, -1, 300L)
         assertEquals(listOf("d", "a", "c"), ids())
@@ -103,7 +131,7 @@ class ProductionQueueRepositoryTest {
         assertThrows(IllegalArgumentException::class.java) { repository.move("a", ProductionLine.UHT, today, 1, 200L) }
         assertThrows(IllegalArgumentException::class.java) { repository.move("a", ProductionLine.BUTTER, tomorrow, 1, 200L) }
         assertThrows(IllegalArgumentException::class.java) { repository.move("a", ProductionLine.BUTTER, today, 2, 200L) }
-        assertThrows(IllegalArgumentException::class.java) { repository.delete(entry.copy(date = tomorrow)) }
+        assertThrows(IllegalArgumentException::class.java) { repository.delete(entry.copy(date = tomorrow), "5522") }
         assertThrows(IllegalArgumentException::class.java) { save("a", line = ProductionLine.UHT) }
         assertThrows(IllegalArgumentException::class.java) { repository.save("a", ProductionLine.BUTTER, today, " ", "", 200L) }
         assertThrows(IllegalArgumentException::class.java) { repository.save("a", ProductionLine.BUTTER, today, "x".repeat(121), "", 200L) }
@@ -165,7 +193,7 @@ class ProductionQueueRepositoryTest {
         assertEquals(BigDecimal("200"), updated.producedAmount)
         assertEquals(BigDecimal("1000"), updated.remainingAmount)
         assertEquals(ProductionQuantityUnit.KG, updated.unit)
-        assertThrows(IllegalArgumentException::class.java) { repository.delete(updated) }
+        assertThrows(IllegalArgumentException::class.java) { repository.delete(updated, "5522") }
         assertEquals(listOf(updated), repository.load())
         database.readableDatabase.rawQuery("SELECT COUNT(*) FROM production_completions", null).use {
             it.moveToFirst(); assertEquals(1, it.getInt(0))
@@ -371,12 +399,12 @@ class ProductionQueueRepositoryTest {
         assertEquals(12, before.productNotes.size); assertEquals(6, before.completions.size)
         assertTrue(before.entries.all { it.completed && it.description == "Pierwotny plan" && it.producedAmount == BigDecimal("1000") })
         assertEquals(ProductNoteStage.COMPLETED, before.productNotes.first().stage)
-        assertThrows(IllegalArgumentException::class.java) { repository.delete(before.entries.first()) }
+        assertThrows(IllegalArgumentException::class.java) { repository.delete(before.entries.first(), "5522") }
         assertEquals(before, repository.snapshot())
         repository.save("unstarted", ProductionLine.BUTTER, today, "Do usunięcia", "", 500L, BigDecimal("100"), pendingOrder = true)
         val unstarted = repository.load().single { it.id == "unstarted" }
         repository.addProductNote("unstarted-note", unstarted, ProductNoteStage.ORDER, "Opis", 501L)
-        repository.delete(unstarted)
+        repository.delete(unstarted, "5522")
         assertEquals(before, repository.snapshot())
     }
 
@@ -470,8 +498,8 @@ class ProductionQueueRepositoryTest {
         assertEquals(before.entries, snapshot.entries); assertEquals(before.completions, snapshot.completions)
         assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("ordinary", "5522") }
         assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("ordinary-receipt", "5522") }
-        assertThrows(IllegalArgumentException::class.java) { repository.delete(snapshot.entries.single()) }
-        assertThrows(IllegalArgumentException::class.java) { repository.delete(snapshot.entries.single().copy(producedAmount = BigDecimal.ZERO)) }
+        assertThrows(IllegalArgumentException::class.java) { repository.delete(snapshot.entries.single(), "5522") }
+        assertThrows(IllegalArgumentException::class.java) { repository.delete(snapshot.entries.single().copy(producedAmount = BigDecimal.ZERO), "5522") }
         assertEquals(snapshot, repository.snapshot())
         repository.close(); repository = ProductionQueueRepository(context, today = { today })
         assertEquals(snapshot, repository.snapshot())

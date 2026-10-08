@@ -1,10 +1,11 @@
 # Milkyway — aplikacja Android
 
-Wersja **0.7.2** dodaje na ekranie głównym przycisk **Inne**, do którego przeniesiono zbiorniki z przewidywaną produkcją oraz wpisy z menu Produkcja. Aplikacja zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
+Wersja **0.7.3** dodaje wspólną **Tablicę ogłoszeń** z kalendarzem, datą i godziną dodania oraz statusem **Załatwione**. Kafelki zamówień i produkcji mają stały rozmiar, pastelowe kolory przypisane do produktu, podgląd notatki i opcjonalny trzycyfrowy kod. Usuwanie pozycji wymaga PIN-u **5522**. Aplikacja zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
 
 Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
 
-- **Start:** uporządkowany ekran z datą, subtelną krówką, trzema przyciskami zmian oraz przyciskami Produkcja, Magazyn/wyprodukowano i Inne. Wybór jednej z trzech zmian otwiera osobny panel z nagłówkiem aktywnej zmiany, polem Notatki i kafelkami: Zbiorniki, Laboratorium, Kontrola parametrów, Przypomnienia i Softlab. Wybór i bieżący ekran zachowują się przy obracaniu telefonu. Strzałka prowadzi do panelu lub wyboru zmiany.
+- **Start:** uporządkowany ekran z datą, subtelną krówką, trzema przyciskami zmian oraz przyciskami Produkcja, Tablica ogłoszeń, Magazyn/wyprodukowano i Inne. Wybór jednej z trzech zmian otwiera osobny panel z nagłówkiem aktywnej zmiany, polem Notatki i kafelkami: Zbiorniki, Laboratorium, Kontrola parametrów, Przypomnienia i Softlab. Wybór i bieżący ekran zachowują się przy obracaniu telefonu. Strzałka prowadzi do panelu lub wyboru zmiany.
+- **Tablica ogłoszeń:** przycisk pod Produkcją otwiera wspólne ogłoszenia wszystkich zmian. Domyślnie pokazuje dzisiaj. Przewijanie w pionie, strzałki i kalendarz zmieniają dzień. Wpisy są przypisane do dnia dodania; edycja i oznaczenie Załatwione zachowują pierwotną datę i godzinę. Nowe ogłoszenie zapisuje się z bieżącą datą i godziną.
 - **Notatki:** pole bezpośrednio w panelu zmiany otwiera bieżące notatki danej zmiany. Wpisy można dodawać, edytować i usuwać; to te same dane, które są dostępne przez Kontrolę parametrów → Bieżące notatki.
 - **Laboratorium:** przycisk w panelu zmiany otwiera ekran zabezpieczony ustalonym PIN-em. Po odblokowaniu można wpisywać pomiary wszystkich działów.
 - **Produkcja:** przycisk na ekranie głównym obok zmian otwiera Kolejkę produkcji z działami Masłownia, Proszkownia i UHT.
@@ -110,3 +111,9 @@ Skonfiguruj `ANDROID_HOME` lub lokalny, ignorowany przez Git plik `local.propert
 ```
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`. Uruchom aplikację z Android Studio na emulatorze lub urządzeniu.
+
+Kafelki w kolejce mają ten sam rozmiar w oczekujących i produkcji oraz przy planowaniu na kolejne dni. Kolor produktu jest stały podczas przenoszenia i zmiany kolejności. Fragment notatki pochodzi z najnowszej notatki produktu, a jeśli jej nie ma — z pola Plan / uwagi. W oczekujących pozostają pierwsze dwa słowa, w produkcji podgląd zajmuje dwie linie. Pełna treść jest nadal dostępna w notatkach produktu.
+
+Tablica ogłoszeń korzysta ze wspólnych wpisów typu REMINDER ze scope 0, zarezerwowanych dla ogłoszeń. Przypomnienia zmian 1–3 pozostają odrębne. Format danych Firebase i bazy lokalnej nie wymaga migracji ani zmiany reguł.
+
+Dotknij małego pola **Kod** na kafelku zamówienia lub produkcji. Wpisz dokładnie trzy cyfry (np. 007) albo pozostaw puste pole, aby usunąć kod. Zmiany kodu zapisują się w historii notatek produktu i we wspólnej bazie; podgląd zwykłej notatki nadal pokazuje treść lub Plan / uwagi. Usuwanie niezrealizowanego zamówienia i produkcji wymaga PIN-u 5522, sprawdzanego także w repozytorium. Towar już wyprodukowany zachowuje historię i jest usuwany z widoku magazynu przez istniejące działanie z PIN-em. PIN jest potwierdzeniem w aplikacji, nie odrębną rolą Firebase; starsze aplikacje trzeba zaktualizować.

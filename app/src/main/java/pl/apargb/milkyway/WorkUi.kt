@@ -167,15 +167,16 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scope: Int, ui: WorkNotesState,
-                           model: WorkNotesViewModel, onClose: () -> Unit) {
+internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scope: Int, ui: WorkNotesState,
+                           model: WorkNotesViewModel, onClose: () -> Unit,
+                           pageTitle: String = kind.title, addLabel: String = kind.addLabel) {
     var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
     var body by rememberSaveable { mutableStateOf(initial?.body ?: "") }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     Dialog(onDismissRequest = { if (!ui.saving) onClose() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Scaffold(topBar = { TopAppBar(title = { Text(if (initial == null) kind.addLabel else "Edytuj wpis") }) },
+        Scaffold(topBar = { TopAppBar(title = { Text(if (initial == null) addLabel else "Edytuj wpis") }) },
             bottomBar = {
                 Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -188,7 +189,7 @@ private fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scope
             }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(if (scope == 0) kind.title else "${kind.title} · Zmiana $scope", color = kind.tone().accent)
+                Text(if (scope == 0) pageTitle else "$pageTitle · Zmiana $scope", color = kind.tone().accent)
                 OutlinedTextField(value = title, onValueChange = { title = it.take(120); model.clearError() },
                     label = { Text("Tytuł") }, enabled = !ui.saving, singleLine = true,
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))

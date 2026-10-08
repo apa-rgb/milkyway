@@ -53,6 +53,7 @@ private enum class Section(val title: String, val icon: ImageVector) {
     Notes("Notatki", Icons.Outlined.NoteAlt),
     Laboratory("Laboratorium", Icons.Outlined.Science),
     Production("Produkcja", Icons.Outlined.Factory),
+    Announcements("Tablica ogłoszeń", Icons.Outlined.Campaign),
     Other("Inne", Icons.Outlined.Apps),
     Completed(WAREHOUSE_TITLE, Icons.Outlined.Inventory2),
     Controls("Kontrola parametrów", Icons.Outlined.Tune)
@@ -113,7 +114,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         else if (section == Section.Controls && controlKind != null) controlName = null
         else sectionName = when (section) {
             Section.Production -> productionReturnSection
-            Section.Other, Section.Completed, Section.Dashboard -> Section.Home.name
+            Section.Announcements, Section.Other, Section.Completed, Section.Dashboard -> Section.Home.name
             else -> Section.Dashboard.name
         }
     }
@@ -143,7 +144,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                         inProduction && productionDestination.parent == ProductionDestination.MENU -> "Wróć do produkcji"
                         inProduction && productionDestination.parent == ProductionDestination.OTHER_MENU -> "Wróć do innych"
                         section == Section.Controls && controlKind != null -> "Wróć do kontroli parametrów"
-                        section == Section.Other || section == Section.Completed || section == Section.Production && productionReturnSection == Section.Home.name -> "Wróć do ekranu głównego"
+                        section == Section.Announcements || section == Section.Other || section == Section.Completed || section == Section.Production && productionReturnSection == Section.Home.name -> "Wróć do ekranu głównego"
                         else -> "Wróć do panelu zmiany"
                     })
                 }
@@ -174,6 +175,8 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                 } else if (labUnlocked) LaboratoryPage(inventory, inventoryModel, selectedShift, inventoryModel::reload)
                 else LaboratoryLockPage(onUnlock = { labUnlocked = true })
             }
+        } else if (section == Section.Announcements) {
+            Box(Modifier.fillMaxSize().padding(padding)) { AnnouncementBoardPage(notes, notesModel) }
         } else if (section == Section.Completed) {
             Box(Modifier.fillMaxSize().padding(padding)) { ProductionCompletedPage(queue, queueModel) }
         } else if (inProduction) {
@@ -229,6 +232,8 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                                         productionDestinationName = ProductionDestination.MENU.name
                                         sectionName = Section.Production.name
                                     }
+                                    HomeProductionAction(Section.Announcements.title, "Ogłoszenia i sprawy do załatwienia", Section.Announcements.icon, Department.Reception,
+                                        Modifier.testTag("home-Announcements")) { sectionName = Section.Announcements.name }
                                     HomeProductionAction(Section.Completed.title, "Towar gotowy i nadwyżki", Icons.Outlined.Inventory2, Department.Processing,
                                         Modifier.testTag("home-Completed"), compactIcon = true) { sectionName = Section.Completed.name }
                                     HomeProductionAction(Section.Other.title, "Zbiorniki i wpisy", Section.Other.icon, Department.Powder,
@@ -254,7 +259,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                         item { MainMenu { sectionName = it.name; controlName = null; productionDestinationName = ProductionDestination.MENU.name } }
                     }
                     Section.Controls -> item { ControlMenu { controlName = it.name; productionDestinationName = ProductionDestination.MENU.name } }
-                    Section.Reminders, Section.Notes, Section.Laboratory, Section.Production, Section.Other, Section.Completed -> Unit
+                    Section.Reminders, Section.Notes, Section.Laboratory, Section.Production, Section.Announcements, Section.Other, Section.Completed -> Unit
                 }
             }
         }

@@ -169,15 +169,16 @@ internal fun ProductionCompletionBubble(entry: ProductionQueueEntry, ui: Product
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun QueueDatePicker(initial: LocalDate, onClose: () -> Unit, onSelect: (LocalDate) -> Unit) {
+internal fun QueueDatePicker(initial: LocalDate, onClose: () -> Unit, onSelect: (LocalDate) -> Unit,
+                             title: String = "Wybierz dzień produkcji", calendarTag: String = "queue-calendar") {
     val state = rememberDatePickerState(initialSelectedDateMillis = initial.calendarMillis(),
         initialDisplayedMonthMillis = initial.calendarMillis())
     DatePickerDialog(onDismissRequest = onClose, confirmButton = {
         TextButton(onClick = { state.selectedDateMillis?.let { onSelect(calendarDate(it)) } },
             enabled = state.selectedDateMillis != null) { Text("Wybierz") }
     }, dismissButton = { TextButton(onClick = onClose) { Text("Anuluj") } }) {
-        DatePicker(state, modifier = Modifier.testTag("queue-calendar"), title = {
-            Text("Wybierz dzień produkcji", Modifier.padding(start = 24.dp, top = 16.dp))
+        DatePicker(state, modifier = Modifier.testTag(calendarTag), title = {
+            Text(title, Modifier.padding(start = 24.dp, top = 16.dp))
         })
     }
 }

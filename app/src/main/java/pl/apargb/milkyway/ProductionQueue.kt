@@ -329,7 +329,14 @@ internal class ProductionQueueRepository(context: Context,
         return load()
     }
 
-    @Synchronized fun delete(entry: ProductionQueueEntry): List<ProductionQueueEntry> {
+    @Synchronized fun setProductionCode(requestId: String, entry: ProductionQueueEntry, code: String, now: Long): List<ProductionQueueEntry> {
+        require(code.isEmpty() || code.matches(Regex("[0-9]{3}"))) { "Kod produkcji musi mieć dokładnie 3 cyfry albo być pusty." }
+        return addProductNote(requestId, entry, if (entry.pendingOrder) ProductNoteStage.ORDER else ProductNoteStage.PRODUCTION,
+            "Kod produkcji: ${code.ifEmpty { "—" }}", now)
+    }
+
+    @Synchronized fun delete(entry: ProductionQueueEntry, pin: String): List<ProductionQueueEntry> {
+        require(warehousePinMatches(pin)) { "Nieprawidłowy PIN." }
         val db = helper.writableDatabase
         db.beginTransaction()
         try {

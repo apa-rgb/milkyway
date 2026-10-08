@@ -28,7 +28,8 @@ internal fun warehousePinMatches(pin: String): Boolean {
 
 @Composable
 internal fun WarehouseDeleteDialog(title: String, summary: String, saving: Boolean, error: String?,
-                                   confirmTag: String, onDelete: (String) -> Unit, onClose: () -> Unit) {
+                                   confirmTag: String, onDelete: (String) -> Unit, onClose: () -> Unit,
+                                   pinTag: String = "warehouse-delete-pin") {
     var pin by remember { mutableStateOf("") }
     var incorrect by remember { mutableStateOf(false) }
     val owner = LocalLifecycleOwner.current
@@ -49,7 +50,7 @@ internal fun WarehouseDeleteDialog(title: String, summary: String, saving: Boole
                 label = { Text("PIN do usuwania") }, singleLine = true, enabled = !saving,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 visualTransformation = PasswordVisualTransformation(), isError = incorrect,
-                modifier = Modifier.fillMaxWidth().testTag("warehouse-delete-pin"))
+                modifier = Modifier.fillMaxWidth().testTag(pinTag))
             if (incorrect) Text("Nieprawidłowy PIN.", color = MaterialTheme.colorScheme.error)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,

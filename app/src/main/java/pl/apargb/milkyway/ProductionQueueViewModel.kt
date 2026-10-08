@@ -67,7 +67,11 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
         it.move(entry.id, entry.line, entry.date, direction, System.currentTimeMillis())
     }
 
-    fun delete(entry: ProductionQueueEntry) = mutate { it.delete(entry) }
+    fun setProductionCode(requestId: String, entry: ProductionQueueEntry, code: String) = mutate(requestId) {
+        it.setProductionCode(requestId, entry, code, System.currentTimeMillis())
+    }
+
+    fun delete(entry: ProductionQueueEntry, pin: String) = mutate { it.delete(entry, pin) }
 
     fun addRejectedGoods(id: String, line: ProductionLine, date: LocalDate, description: String, kilograms: BigDecimal) = mutate(id) {
         it.addRejectedGoods(id, line, date, description, kilograms, System.currentTimeMillis())

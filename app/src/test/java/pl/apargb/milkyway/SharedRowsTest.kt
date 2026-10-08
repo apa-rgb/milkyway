@@ -82,7 +82,7 @@ class SharedRowsTest {
             val entry = repo.load().single()
             assertEquals(BigDecimal("750"), entry.producedAmount); assertEquals(BigDecimal("250"), entry.remainingAmount)
             assertEquals(2, repo.snapshot().completions.size)
-            assertThrows(IllegalArgumentException::class.java) { repo.delete(entry.copy(producedAmount = BigDecimal.ZERO)) }
+            assertThrows(IllegalArgumentException::class.java) { repo.delete(entry.copy(producedAmount = BigDecimal.ZERO), "5522") }
             repo.recordProduction("finish", "product", ProductionLine.BUTTER, day, null, 4L)
             assertEquals(BigDecimal("1000"), repo.load().single().producedAmount)
         }
