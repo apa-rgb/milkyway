@@ -80,7 +80,7 @@ private fun ProductionMenu(destination: ProductionDestination, onNavigate: (Prod
                 ProductionDestination.NOTES -> "Notatki o przebiegu produkcji na tej zmianie"
                 ProductionDestination.QUEUE -> "Masłownia, proszkownia i UHT"
                 else -> "Kolejka produkcji działu"
-            }, icon, tone, Modifier.fillMaxWidth().testTag("production-${option.name.lowercase()}")) { onNavigate(option) }
+            }, icon, tone, Modifier.fillMaxWidth().testTag("production-${option.name.lowercase()}"), cornerRadius = 14.dp) { onNavigate(option) }
         }
     }
 }
@@ -131,7 +131,7 @@ private fun ProductionTanksPage(ui: InventoryUiState, assumptions: Map<Departmen
                     val status = ui.overview.states[tank.id] ?: TankStatus()
                     val estimate = estimateProduction(tank, status, settings)
                     Card(onClick = { onEdit(tank) }, modifier = Modifier.fillMaxWidth().testTag("production-tank-${tank.id}"),
-                        shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = department.tint)) {
+                        shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = department.tint)) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,

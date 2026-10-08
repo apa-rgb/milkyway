@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.time.Instant
@@ -29,11 +30,11 @@ import java.util.UUID
 
 @Composable
 fun MenuTile(title: String, caption: String, icon: ImageVector, tone: Department, modifier: Modifier = Modifier,
-             onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(24.dp),
+             cornerRadius: Dp = 24.dp, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(color = tone.tint, shape = RoundedCornerShape(16.dp)) {
+            Surface(color = tone.tint, shape = RoundedCornerShape(cornerRadius * (2f / 3f))) {
                 Icon(icon, null, Modifier.padding(14.dp).size(28.dp), tint = tone.accent)
             }
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

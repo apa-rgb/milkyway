@@ -11,8 +11,8 @@ android {
         applicationId = "pl.apargb.milkyway"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "0.6.11"
+        versionCode = 24
+        versionName = "0.6.12"
     }
     buildFeatures { compose = true }
     compileOptions {

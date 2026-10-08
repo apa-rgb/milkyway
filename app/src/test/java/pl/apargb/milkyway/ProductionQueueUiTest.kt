@@ -559,6 +559,8 @@ class ProductionQueueUiTest {
             it(0f, dayTop - planTop)
         }
         compose.onNodeWithTag("queue-date").assert(hasText(queueDateLabel(today.plusDays(2))))
+        compose.onNodeWithTag("queue-list").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(0f, -160f) }
+        screenshot("kolejka-granica-dni-delikatne-kolory")
         compose.onNodeWithText("Dzisiaj").performClick()
         compose.onNodeWithTag("queue-date").assert(hasText(queueDateLabel(today)))
         compose.onNodeWithTag("queue-entry-exact-time").assertDoesNotExist()

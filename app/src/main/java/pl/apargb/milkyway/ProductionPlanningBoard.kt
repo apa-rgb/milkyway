@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -257,8 +259,15 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                         }) { index ->
                             val day = startDate.plusDays((index / 13).toLong())
                             val entries = activeByDay[day].orEmpty()
+                            val dayShade = when (Math.floorMod(day.toEpochDay(), 3L)) {
+                                0L -> Color(0xFFDCE9F5)
+                                1L -> line.tone.tint
+                                else -> Color(0xFFDDEFE4)
+                            }
+                            val dayBackground = lerp(lerp(MaterialTheme.colorScheme.surface, line.tone.tint, .55f), dayShade, .32f)
                             if (index % 13 == 0) {
-                                Column(Modifier.fillMaxWidth().testTag("queue-day-$day"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Column(Modifier.fillMaxWidth().testTag("queue-day-$day")
+                                    .background(dayBackground, RoundedCornerShape(12.dp)), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text(queueDateLabel(day), Modifier.padding(4.dp), fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelMedium, color = line.tone.accent)
                                     if (entries.isEmpty()) Text("Brak produkcji na ten dzień", Modifier.padding(4.dp),
@@ -280,8 +289,8 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                 DisposableEffect(slot) { onDispose { hourBounds.remove(slot) } }
                                 val scheduled = entries.filter { it.scheduledTime?.hour?.let { h -> h >= hour && h < hour + 2 } == true }
                                 Surface(Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("queue-hour-$day-$hour")
-                                    .onGloballyPositioned { hourBounds[slot] = it.boundsInRoot() }, shape = RoundedCornerShape(10.dp),
-                                    color = if (highlighted == slot) line.tone.accent.copy(alpha = .18f) else MaterialTheme.colorScheme.surface.copy(alpha = .5f),
+                                    .onGloballyPositioned { hourBounds[slot] = it.boundsInRoot() }, shape = RoundedCornerShape(12.dp),
+                                    color = if (highlighted == slot) line.tone.accent.copy(alpha = .18f) else dayBackground,
                                     border = if (highlighted == slot) BorderStroke(2.dp, line.tone.accent) else null) {
                                     Column(Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text("%02d:00–%02d:00".format(hour, hour + 2), style = MaterialTheme.typography.labelSmall, color = line.tone.accent)
@@ -346,7 +355,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
         dragged?.let { entry ->
             Surface(Modifier.offset { IntOffset((pointer.x - rootOrigin.x - 70.dp.toPx()).roundToInt(),
                 (pointer.y - rootOrigin.y - 35.dp.toPx()).roundToInt()) }.width(150.dp),
-                shadowElevation = 8.dp, shape = RoundedCornerShape(12.dp), color = line.tone.accent) {
+                shadowElevation = 8.dp, shape = RoundedCornerShape(14.dp), color = line.tone.accent) {
                 Column(Modifier.padding(10.dp)) {
                     Text(entry.title, color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold, maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
@@ -412,7 +421,7 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     } finally { if (!finished) cancel() }
                 }
             }
-        }, color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(10.dp),
+        }, color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .22f))) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
