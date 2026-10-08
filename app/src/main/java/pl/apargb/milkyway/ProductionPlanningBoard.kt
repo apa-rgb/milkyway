@@ -426,7 +426,8 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
                 }
             }
-            latestNote?.let { Text(it.text, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+            latestNote?.let { Text(if (entry.pendingOrder) orderNotePreview(it.text) else it.text,
+                modifier = Modifier.testTag("queue-note-preview-${entry.id}"), style = MaterialTheme.typography.labelSmall, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text("${entry.remainingAmount?.let(::decimalLabel) ?: "—"} ${entry.unit.label}" +
                 (entry.scheduledTime?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall)
@@ -447,7 +448,7 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     contentPadding = PaddingValues(2.dp)) { Text("Wyprodukowano", style = MaterialTheme.typography.labelSmall) }
                 TextButton(onClick = onReturnToPending, enabled = enabled, modifier = Modifier.fillMaxWidth()
                     .testTag("queue-return-${entry.id}"), contentPadding = PaddingValues(2.dp)) {
-                    Text("Do oczekujących", style = MaterialTheme.typography.labelSmall)
+                    Icon(Icons.Outlined.MoveToInbox, "Przenieś do oczekujących", Modifier.size(16.dp))
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -476,4 +477,6 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
 }
 
 internal data class ProductionPlanSlot(val date: LocalDate, val hour: Int)
+internal fun orderNotePreview(text: String): String = text.trim().split(Regex("[\\s\\u00a0]+"))
+    .filter { it.isNotEmpty() }.take(2).joinToString(" ")
 private data class TimelineViewport(val start: String, val first: Int, val offset: Int, val last: Int, val total: Int)

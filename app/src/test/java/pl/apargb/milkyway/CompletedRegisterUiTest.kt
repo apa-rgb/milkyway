@@ -88,6 +88,8 @@ class CompletedRegisterUiTest {
         compose.onNodeWithText("Anuluj").performClick()
         compose.onNodeWithTag("completed-rejected-${rejected.id}").assertExists()
         compose.onNodeWithTag("rejected-delete-${rejected.id}").performClick()
+        compose.onNodeWithTag("rejected-delete-confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("warehouse-delete-pin").performTextInput("5522")
         compose.onNodeWithTag("rejected-delete-confirm").performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.rejectedGoods.isEmpty() } }
         compose.onNodeWithTag("completed-rejected-${rejected.id}").assertDoesNotExist()
@@ -96,6 +98,41 @@ class CompletedRegisterUiTest {
         compose.activityRule.scenario.recreate()
         compose.onAllNodesWithContentDescription("Usuń wybrakowany towar").assertCountEquals(0)
         compose.onNodeWithTag("completed-entry-ordinary").assertExists()
+    }
+
+    @Test fun warehousePinRejectsIncorrectValuesClearsOnRotationAndRemovesOnlySelectedDay() {
+        var day = today.minusDays(1)
+        ProductionQueueRepository(model.getApplication(), today = { day }).useForTest { repository ->
+            repository.save("pin-product", ProductionLine.BUTTER, day, "Masło", "", 100L, BigDecimal("1000"))
+            repository.recordProduction("yesterday", "pin-product", ProductionLine.BUTTER, day, BigDecimal("100"), 101L)
+            day = today
+            repository.schedule(repository.load().single(), day, LocalTime.NOON, 102L)
+            repository.recordProduction("today", "pin-product", ProductionLine.BUTTER, day, BigDecimal("300"), 103L)
+        }
+        refresh(); compose.onNodeWithTag("home-Completed").performClick()
+        compose.onNodeWithTag("completed-entry-pin-product").performClick()
+        compose.onNodeWithTag("warehouse-delete").performClick()
+        compose.onNodeWithTag("warehouse-delete-confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("warehouse-delete-pin").performTextInput("2426")
+        compose.onNodeWithTag("warehouse-delete-confirm").performClick()
+        compose.onNodeWithText("Nieprawidłowy PIN.").assertExists()
+        assertTrue(compose.runOnIdle { model.state.value.completions.all { it.warehouseRemovedAt == null } })
+        compose.onNodeWithTag("warehouse-delete-pin").performTextInput("5522")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("warehouse-delete-confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("warehouse-delete-pin").performTextInput("5522")
+        screenshot("magazyn-usuwanie-pin")
+        compose.onNodeWithTag("warehouse-delete-confirm").performClick()
+        compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.completions.any { it.warehouseRemovedAt != null } } }
+        compose.onNodeWithTag("completed-entry-pin-product").assertDoesNotExist()
+        compose.onNodeWithTag("completed-day-summary").assertTextEquals("Produkcja: 0  |  Wybrakowane: 0 kg")
+        assertEquals(BigDecimal("400"), compose.runOnIdle { model.state.value.entries.single().producedAmount })
+        assertEquals(BigDecimal("600"), compose.runOnIdle { model.state.value.entries.single().remainingAmount })
+        compose.onNodeWithTag("completed-previous-day").performClick()
+        compose.onNodeWithTag("completed-amount-pin-product", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 100 kg")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("completed-today").performClick()
+        compose.onNodeWithTag("completed-entry-pin-product").assertDoesNotExist()
     }
 
     @Test fun dailyRegisterUsesActualExecutionDaysAndCalendarRetainsTheSelectedDayAfterRotation() {

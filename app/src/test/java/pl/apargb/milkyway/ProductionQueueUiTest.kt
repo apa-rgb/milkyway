@@ -7,6 +7,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import org.junit.Before
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +24,9 @@ class ProductionQueueUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private lateinit var model: ProductionQueueViewModel
     private val today get() = LocalDate.now()
+    private inline fun ProductionQueueRepository.useForTest(block: (ProductionQueueRepository) -> Unit) {
+        try { block(this) } finally { close() }
+    }
 
     @Before fun emptyPlans() {
         model = ViewModelProvider(compose.activity)[ProductionQueueViewModel::class.java]
@@ -76,6 +80,38 @@ class ProductionQueueUiTest {
         file.parentFile!!.mkdirs()
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
+    }
+
+    @Test fun incomingCardsShowTwoWordsKeepTheirSizeAndRetainTheFullNoteInHistory() {
+        ProductionQueueRepository(model.getApplication()).useForTest { repo ->
+            ProductionLine.entries.forEach { line ->
+                val id = "preview-${line.name}"
+                repo.save(id, line, today, "Partia mleka", "", 1L, java.math.BigDecimal("1000"), pendingOrder = true)
+                repo.addProductNote("short-${line.name}", repo.load().single { it.id == id }, ProductNoteStage.ORDER, "Pilna partia", 2L)
+            }
+        }
+        compose.runOnIdle { model.reload() }
+        compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.loading } }
+        openQueue()
+        listOf(ProductionLine.BUTTER to "butter", ProductionLine.POWDER to "powder", ProductionLine.UHT to "uht").forEach { (line, menu) ->
+            val id = "preview-${line.name}"
+            compose.onNodeWithTag("production-queue_$menu").performClick()
+            val before = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
+            val fullText = "Pilna\npartia\u00a0do realizacji jutro rano"
+            ProductionQueueRepository(model.getApplication()).useForTest { repo ->
+                repo.addProductNote("long-${line.name}", repo.load().single { it.id == id }, ProductNoteStage.ORDER, fullText, 3L)
+            }
+            compose.runOnIdle { model.reload() }
+            compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.loading } }
+            compose.onNodeWithTag("queue-note-preview-$id", useUnmergedTree = true).assertTextEquals("Pilna partia")
+            val after = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
+            assertEquals(before.width, after.width, .1f); assertEquals(before.height, after.height, .1f)
+            compose.onNodeWithTag("product-notes-$id").performClick()
+            compose.onNodeWithTag("product-note-long-${line.name}").performScrollTo().assertTextEquals(fullText)
+            compose.onNodeWithText("Anuluj").performClick()
+            if (line == ProductionLine.BUTTER) screenshot("zamowienie-dwa-slowa-notatki")
+            compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
+        }
     }
 
     @Test fun everyLineDefaultsToTodayAndFuturePlansStayOnTheirOwnDayAfterRotation() {

@@ -468,14 +468,16 @@ class ProductionQueueRepositoryTest {
         assertEquals(3, snapshot.rejectedGoods.count { it.date == today })
         assertEquals(BigDecimal("12.345"), snapshot.rejectedGoods.single { it.id == "reject-UHT" }.kilograms)
         assertEquals(before.entries, snapshot.entries); assertEquals(before.completions, snapshot.completions)
-        assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("ordinary") }
-        assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("ordinary-receipt") }
+        assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("ordinary", "5522") }
+        assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("ordinary-receipt", "5522") }
         assertThrows(IllegalArgumentException::class.java) { repository.delete(snapshot.entries.single()) }
         assertThrows(IllegalArgumentException::class.java) { repository.delete(snapshot.entries.single().copy(producedAmount = BigDecimal.ZERO)) }
         assertEquals(snapshot, repository.snapshot())
         repository.close(); repository = ProductionQueueRepository(context, today = { today })
         assertEquals(snapshot, repository.snapshot())
-        repository.deleteRejectedGoods("reject-UHT")
+        assertThrows(IllegalArgumentException::class.java) { repository.deleteRejectedGoods("reject-UHT", "2426") }
+        assertEquals(4, repository.snapshot().rejectedGoods.size)
+        repository.deleteRejectedGoods("reject-UHT", "5522")
         snapshot = repository.snapshot()
         assertEquals(3, snapshot.rejectedGoods.size)
         assertEquals(before.entries, snapshot.entries); assertEquals(before.completions, snapshot.completions)
@@ -539,4 +541,67 @@ class ProductionQueueRepositoryTest {
         assertEquals("Po aktualizacji", repository.snapshot().productNotes.single().text)
     }
 
+    @Test fun warehouseRemovalRequiresPinPreservesLedgerAndOtherDaysAndSurvivesRetryAndReopening() {
+        repository.save("product", ProductionLine.BUTTER, today, "Masło", "Opis", 100L, BigDecimal("1000"))
+        repository.recordProduction("first", "product", ProductionLine.BUTTER, today, BigDecimal("300"), 101L)
+        repository.addProductNote("note", repository.load().single(), ProductNoteStage.COMPLETED, "Ważna notatka", 102L)
+        repository.close(); repository = ProductionQueueRepository(context, today = { tomorrow })
+        repository.schedule(repository.load().single(), tomorrow, java.time.LocalTime.NOON, 200L)
+        repository.recordProduction("second", "product", ProductionLine.BUTTER, tomorrow, BigDecimal("200"), 201L)
+        val before = repository.snapshot()
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.removeFromWarehouse("remove", "product", today, setOf("first"), "2426", 300L)
+        }
+        assertEquals(before, repository.snapshot())
+        repository.removeFromWarehouse("remove", "product", today, setOf("first"), "5522", 300L)
+        repository.removeFromWarehouse("remove", "product", today, setOf("first"), "5522", 301L)
+        repository.close(); repository = ProductionQueueRepository(context, today = { tomorrow })
+        val after = repository.snapshot()
+        assertEquals(before.entries, after.entries); assertEquals(before.productNotes, after.productNotes)
+        assertEquals(BigDecimal("500"), after.entries.single().remainingAmount)
+        assertEquals(before.completions.map { it.id to it.amount }, after.completions.map { it.id to it.amount })
+        assertEquals(300L, after.completions.single { it.id == "first" }.warehouseRemovedAt)
+        assertTrue(completedProductsForDay(after.entries, after.completions, today).isEmpty())
+        assertEquals(BigDecimal("200"), completedProductsForDay(after.entries, after.completions, tomorrow).single().amount)
+    }
+
+    @Test fun staleRemovalNeverHidesNewProductionAndNewReceiptsRemainVisibleAfterRemoval() {
+        repository.save("product", ProductionLine.POWDER, today, "Proszek", "", 100L, BigDecimal("1000"))
+        repository.recordProduction("first", "product", ProductionLine.POWDER, today, BigDecimal("200"), 101L)
+        repository.recordProduction("second", "product", ProductionLine.POWDER, today, BigDecimal("300"), 102L)
+        val before = repository.snapshot()
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.removeFromWarehouse("stale", "product", today, setOf("first"), "5522", 200L)
+        }
+        assertEquals(before, repository.snapshot())
+        repository.removeFromWarehouse("remove", "product", today, setOf("first", "second"), "5522", 201L)
+        repository.recordProduction("third", "product", ProductionLine.POWDER, today, BigDecimal("100"), 202L)
+        repository.removeFromWarehouse("remove", "product", today, setOf("first", "second"), "5522", 203L)
+        val after = repository.snapshot()
+        assertEquals(BigDecimal("100"), completedProductsForDay(after.entries, after.completions, today).single().amount)
+        assertEquals(BigDecimal("600"), after.entries.single().producedAmount)
+        assertEquals(BigDecimal("400"), after.entries.single().remainingAmount)
+    }
+
+    @Test fun versionFiveMigrationPreservesPlansReceiptsNotesAndRejectedGoods() {
+        repository.save("product", ProductionLine.UHT, today, "Mleko", "Opis", 100L, BigDecimal("1000"))
+        repository.recordProduction("first", "product", ProductionLine.UHT, today, BigDecimal("200"), 101L)
+        repository.addProductNote("note", repository.load().single(), ProductNoteStage.COMPLETED, "Notatka partii", 102L)
+        repository.addRejectedGoods("reject", ProductionLine.UHT, today, "Brak", BigDecimal("3"), 103L)
+        val before = repository.snapshot(); repository.close()
+        context.openOrCreateDatabase(ProductionQueueDatabase.NAME, Context.MODE_PRIVATE, null).use { db ->
+            db.execSQL("CREATE TABLE old_completions (id TEXT PRIMARY KEY, entry_id TEXT NOT NULL, amount TEXT NOT NULL, produced_on TEXT NOT NULL, occurred_at INTEGER NOT NULL)")
+            db.execSQL("INSERT INTO old_completions SELECT id, entry_id, amount, produced_on, occurred_at FROM production_completions")
+            db.execSQL("DROP TABLE production_completions")
+            db.execSQL("ALTER TABLE old_completions RENAME TO production_completions")
+            db.execSQL("CREATE INDEX production_completions_entry ON production_completions(entry_id)")
+            db.version = 5
+        }
+        repository = ProductionQueueRepository(context, today = { today })
+        assertEquals(before, repository.snapshot())
+        repository.removeFromWarehouse("remove", "product", today, setOf("first"), "5522", 200L)
+        val after = repository.snapshot()
+        assertTrue(completedProductsForDay(after.entries, after.completions, today).isEmpty())
+        assertEquals(before.entries, after.entries); assertEquals(before.rejectedGoods, after.rejectedGoods)
+    }
 }

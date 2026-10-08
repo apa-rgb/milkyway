@@ -88,6 +88,32 @@ class SharedRowsTest {
         }
     }
 
+    @Test fun sharedWarehouseRemovalUpgradesOldSchemaAndPersistsWithoutChangingProductionAmounts() {
+        val day = LocalDate.now()
+        val old = ProductionQueueDatabase(context, null).useDatabase { helper ->
+            val repo = ProductionQueueRepository(context, helper as ProductionQueueDatabase)
+            repo.save("product", ProductionLine.BUTTER, day, "Masło", "", 1L, BigDecimal("1000"))
+            repo.recordProduction("receipt", "product", ProductionLine.BUTTER, day, BigDecimal("400"), 2L)
+            SharedRows.capture(helper, SharedDomain.PRODUCTION, emptyMap(), actor1, 3L) + ("schema" to 1L)
+        }
+        val updated = ProductionQueueDatabase(context, null).useDatabase { helper ->
+            SharedRows.restore(helper, SharedDomain.PRODUCTION, old)
+            ProductionQueueRepository(context, helper as ProductionQueueDatabase)
+                .removeFromWarehouse("remove", "product", day, setOf("receipt"), "5522", 4L)
+            SharedRows.capture(helper, SharedDomain.PRODUCTION, old, actor2, 5L)
+        }
+        assertEquals(2L, updated["schema"])
+        ProductionQueueDatabase(context, null).useDatabase { helper ->
+            SharedRows.restore(helper, SharedDomain.PRODUCTION, updated)
+            val snapshot = ProductionQueueRepository(context, helper as ProductionQueueDatabase).snapshot()
+            assertEquals(BigDecimal("400"), snapshot.entries.single().producedAmount)
+            assertEquals(BigDecimal("600"), snapshot.entries.single().remainingAmount)
+            assertEquals(4L, snapshot.completions.single().warehouseRemovedAt)
+            assertTrue(completedProductsForDay(snapshot.entries, snapshot.completions, day).isEmpty())
+            assertEquals(actor2 + ("at" to 5L), SharedRows.tables(updated).getValue("production_completions").values.single()["_actor"])
+        }
+    }
+
     @Test fun operatorsCannotAddLaboratoryMarkersButCanPreserveOrClearExistingOnes() {
         val initial = inventory(emptyMap()) { it.apply("initial") { r -> r.setState("LBT 1", BigDecimal("100"), Measurements(), 1L) } }
         val lab = inventory(initial) { it.apply("lab") { r -> r.updateMeasurements("LBT 1", Measurements(brix = BigDecimal("12")), 2L) } }

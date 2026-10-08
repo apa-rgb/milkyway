@@ -6,10 +6,10 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteOpenHelper
 import java.util.Base64
 
-internal enum class SharedDomain(val path: String, val tables: List<String>) {
+internal enum class SharedDomain(val path: String, val tables: List<String>, val schema: Int = 1) {
     INVENTORY("inventory", listOf("tank_states", "movements")),
     NOTES("notes", listOf("work_notes")),
-    PRODUCTION("production", listOf("production_queue", "production_completions", "production_product_notes", "production_rejects"));
+    PRODUCTION("production", listOf("production_queue", "production_completions", "production_product_notes", "production_rejects"), schema = 2);
 
     fun database(context: Context): SQLiteOpenHelper = when (this) {
         INVENTORY -> InventoryDatabase(context, null)
@@ -34,7 +34,8 @@ internal object SharedRows {
         (snapshot["tables"] as? Map<String, Map<String, Map<String, Any?>>>) ?: emptyMap()
 
     fun restore(helper: SQLiteOpenHelper, domain: SharedDomain, snapshot: Map<String, Any?>) {
-        require(snapshot.isEmpty() || (snapshot["schema"] as? Number)?.toInt() == 1) { "Zaktualizuj aplikację: inna wersja wspólnej bazy." }
+        val schema = (snapshot["schema"] as? Number)?.toInt()
+        require(snapshot.isEmpty() || schema == domain.schema || domain == SharedDomain.PRODUCTION && schema == 1) { "Zaktualizuj aplikację: inna wersja wspólnej bazy." }
         val tables = tables(snapshot)
         require(tables.keys.all { it in domain.tables }) { "Nieznana tabela wspólnej bazy." }
         val db = helper.writableDatabase
@@ -90,7 +91,7 @@ internal object SharedRows {
                 }
             }
         }
-        return mapOf("schema" to 1L, "revision" to (((previous["revision"] as? Number)?.toLong() ?: 0L) + 1),
+        return mapOf("schema" to domain.schema.toLong(), "revision" to (((previous["revision"] as? Number)?.toLong() ?: 0L) + 1),
             "updatedAt" to now, "actor" to actor, "tables" to tables)
     }
 

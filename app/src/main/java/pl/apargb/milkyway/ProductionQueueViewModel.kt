@@ -73,7 +73,11 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
         it.addRejectedGoods(id, line, date, description, kilograms, System.currentTimeMillis())
     }
 
-    fun deleteRejectedGoods(id: String) = mutate { it.deleteRejectedGoods(id) }
+    fun deleteRejectedGoods(requestId: String, id: String, pin: String) = mutate(requestId) { it.deleteRejectedGoods(id, pin) }
+
+    internal fun removeFromWarehouse(requestId: String, product: CompletedDayProduct, date: LocalDate, pin: String) = mutate(requestId) {
+        it.removeFromWarehouse(requestId, product.entry.id, date, product.receipts.map { receipt -> receipt.id }.toSet(), pin, System.currentTimeMillis())
+    }
 
     private fun mutate(requestId: String? = null, action: (ProductionQueueRepository) -> List<ProductionQueueEntry>) {
         if (mutableState.value.loading || mutableState.value.saving || mutableState.value.loadError != null) return

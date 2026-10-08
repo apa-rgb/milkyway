@@ -30,7 +30,8 @@ data class ProductionQueueEntry(val id: String, val line: ProductionLine, val da
 }
 
 data class ProductionCompletion(val id: String, val entryId: String, val amount: BigDecimal,
-                                val producedOn: LocalDate, val occurredAt: Long)
+                                val producedOn: LocalDate, val occurredAt: Long,
+                                val warehouseRemovedAt: Long? = null, val warehouseRemovalId: String? = null)
 enum class ProductNoteStage(val title: String) { ORDER("Zamówienie"), PRODUCTION("Produkcja"), COMPLETED("Wyprodukowano") }
 data class ProductNote(val id: String, val entryId: String, val stage: ProductNoteStage, val text: String, val createdAt: Long)
 data class RejectedGoods(val id: String, val line: ProductionLine, val date: LocalDate, val description: String,
@@ -38,7 +39,7 @@ data class RejectedGoods(val id: String, val line: ProductionLine, val date: Loc
 internal data class ProductionQueueSnapshot(val entries: List<ProductionQueueEntry>, val completions: List<ProductionCompletion>,
                                             val productNotes: List<ProductNote>, val rejectedGoods: List<RejectedGoods>)
 
-internal class ProductionQueueDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 5) {
+internal class ProductionQueueDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 6) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE production_queue (
             id TEXT PRIMARY KEY, line TEXT NOT NULL CHECK(line IN ('BUTTER', 'POWDER', 'UHT')),
@@ -54,7 +55,7 @@ internal class ProductionQueueDatabase(context: Context, name: String? = NAME) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        check(oldVersion in 1..4 && newVersion == 5)
+        check(oldVersion in 1..5 && newVersion == 6)
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE production_queue ADD COLUMN planned_amount TEXT")
             db.execSQL("ALTER TABLE production_queue ADD COLUMN produced_amount TEXT NOT NULL DEFAULT '0'")
@@ -68,7 +69,14 @@ internal class ProductionQueueDatabase(context: Context, name: String? = NAME) :
             db.execSQL("ALTER TABLE production_queue ADD COLUMN planned_time TEXT")
         }
         if (oldVersion < 4) createProductNotes(db)
-        createRejectedGoods(db)
+        if (oldVersion < 5) createRejectedGoods(db)
+        if (oldVersion < 6) {
+            val columns = db.rawQuery("PRAGMA table_info(production_completions)", null).use { cursor ->
+                buildSet { while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("name"))) }
+            }
+            if ("warehouse_removed_at" !in columns) db.execSQL("ALTER TABLE production_completions ADD COLUMN warehouse_removed_at INTEGER")
+            if ("warehouse_removal_id" !in columns) db.execSQL("ALTER TABLE production_completions ADD COLUMN warehouse_removal_id TEXT")
+        }
     }
 
     private fun createRejectedGoods(db: SQLiteDatabase) {
@@ -90,7 +98,7 @@ internal class ProductionQueueDatabase(context: Context, name: String? = NAME) :
     private fun createCompletions(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE production_completions (
             id TEXT PRIMARY KEY, entry_id TEXT NOT NULL, amount TEXT NOT NULL,
-            produced_on TEXT NOT NULL, occurred_at INTEGER NOT NULL
+            produced_on TEXT NOT NULL, occurred_at INTEGER NOT NULL, warehouse_removed_at INTEGER, warehouse_removal_id TEXT
         )""")
         db.execSQL("CREATE INDEX production_completions_entry ON production_completions(entry_id)")
     }
@@ -116,7 +124,9 @@ internal class ProductionQueueRepository(context: Context,
                     while (cursor.moveToNext()) {
                         fun string(name: String) = cursor.getString(cursor.getColumnIndexOrThrow(name))
                         add(ProductionCompletion(string("id"), string("entry_id"), string("amount").toBigDecimal(),
-                            LocalDate.parse(string("produced_on")), cursor.getLong(cursor.getColumnIndexOrThrow("occurred_at"))))
+                            LocalDate.parse(string("produced_on")), cursor.getLong(cursor.getColumnIndexOrThrow("occurred_at")),
+                            cursor.getColumnIndexOrThrow("warehouse_removed_at").let { if (cursor.isNull(it)) null else cursor.getLong(it) },
+                            cursor.getColumnIndexOrThrow("warehouse_removal_id").let { if (cursor.isNull(it)) null else cursor.getString(it) }))
                     }
                 }
             }
@@ -324,7 +334,7 @@ internal class ProductionQueueRepository(context: Context,
         db.beginTransaction()
         try {
             val current = find(db, entry.id) ?: throw IllegalArgumentException("Nie znaleziono produktu.")
-            require(current.producedAmount.signum() == 0) { "Zapisów wyprodukowanego towaru nie można usuwać. Możesz usuwać tylko wpisy wybrakowanego towaru." }
+            require(current.producedAmount.signum() == 0) { "Wyprodukowany towar usuń z widoku magazynu po podaniu PIN-u." }
             require(db.delete("production_queue", "id = ? AND line = ? AND plan_date = ?",
                 arrayOf(entry.id, entry.line.name, entry.date.toString())) == 1) { "Nie znaleziono produkcji w tym dniu i dziale." }
             db.delete("production_completions", "entry_id = ?", arrayOf(entry.id))
@@ -361,7 +371,40 @@ internal class ProductionQueueRepository(context: Context,
         return load()
     }
 
-    @Synchronized fun deleteRejectedGoods(id: String): List<ProductionQueueEntry> {
+    /** Remove this day's warehouse record, retaining the production ledger and remaining queue. */
+    @Synchronized fun removeFromWarehouse(requestId: String, entryId: String, date: LocalDate,
+                                         receiptIds: Set<String>, pin: String, now: Long): List<ProductionQueueEntry> {
+        require(warehousePinMatches(pin)) { "Nieprawidłowy PIN." }
+        require(requestId.isNotBlank() && receiptIds.isNotEmpty()) { "Wybierz wpis magazynu do usunięcia." }
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val previous = db.query("production_completions", arrayOf("id", "entry_id", "produced_on"),
+                "warehouse_removal_id = ?", arrayOf(requestId), null, null, null).use { cursor ->
+                buildSet {
+                    while (cursor.moveToNext()) {
+                        require(cursor.getString(1) == entryId && cursor.getString(2) == date.toString()) { "Identyfikator usunięcia należy do innego wpisu." }
+                        add(cursor.getString(0))
+                    }
+                }
+            }
+            if (previous.isNotEmpty()) require(previous == receiptIds) { "Identyfikator usunięcia należy do innego wpisu." }
+            else {
+                val current = db.query("production_completions", arrayOf("id"),
+                    "entry_id = ? AND produced_on = ? AND warehouse_removed_at IS NULL", arrayOf(entryId, date.toString()),
+                    null, null, null).use { cursor -> buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) } }
+                require(current == receiptIds) { "Wpis magazynu został zmieniony. Otwórz usuwanie ponownie." }
+                db.update("production_completions", ContentValues().apply {
+                    put("warehouse_removed_at", now); put("warehouse_removal_id", requestId)
+                }, "entry_id = ? AND produced_on = ? AND warehouse_removed_at IS NULL", arrayOf(entryId, date.toString()))
+            }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        return load()
+    }
+
+    @Synchronized fun deleteRejectedGoods(id: String, pin: String): List<ProductionQueueEntry> {
+        require(warehousePinMatches(pin)) { "Nieprawidłowy PIN." }
         require(helper.writableDatabase.delete("production_rejects", "id = ?", arrayOf(id)) == 1) { "Nie znaleziono wpisu wybrakowanego towaru." }
         return load()
     }

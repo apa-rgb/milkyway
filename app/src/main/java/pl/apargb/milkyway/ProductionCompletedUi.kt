@@ -37,6 +37,8 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
     var detailsId by rememberSaveable { mutableStateOf<String?>(null) }
     var rejectDetailsId by rememberSaveable { mutableStateOf<String?>(null) }
     var deletingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var removingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var removalRequest by rememberSaveable { mutableStateOf<String?>(null) }
     var addingId by rememberSaveable { mutableStateOf<String?>(null) }
     val date = firstDay.plusDays(days.currentPage.toLong())
     val line = department?.let(ProductionLine::valueOf)
@@ -87,7 +89,7 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
                     onDetails = { detailsId = it },
                     onNotes = { model.clearError(); notesId = it },
                     onRejectedDetails = { rejectDetailsId = it },
-                    onDeleteRejected = { model.clearError(); deletingId = it })
+                    onDeleteRejected = { model.clearError(); deletingId = it; removalRequest = UUID.randomUUID().toString() })
             }
         }
     }
@@ -99,7 +101,21 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
         }
         addingId = null
     } } }
-    products.find { it.entry.id == detailsId }?.let { CompletedProductDetails(it, date) { detailsId = null } }
+    products.find { it.entry.id == detailsId }?.let { product ->
+        CompletedProductDetails(product, date, enabled, onDelete = {
+            model.clearError(); removingId = product.entry.id; removalRequest = UUID.randomUUID().toString(); detailsId = null
+        }, onClose = { detailsId = null })
+    }
+    LaunchedEffect(ui.lastSavedRequestId, removalRequest) {
+        if (removalRequest != null && ui.lastSavedRequestId == removalRequest) { removingId = null; deletingId = null; removalRequest = null }
+    }
+    products.find { it.entry.id == removingId }?.let { product -> key(removalRequest) {
+        WarehouseDeleteDialog("Usunąć wpis z magazynu?",
+            "${product.entry.title}\n${decimalLabel(product.amount)} ${product.entry.unit.label} · ${queueDateLabel(date)}\nHistoria wykonanej produkcji zostaje zachowana.",
+            ui.saving, ui.operationError, "warehouse-delete-confirm",
+            onDelete = { pin -> removalRequest?.let { model.removeFromWarehouse(it, product, date, pin) } },
+            onClose = { removingId = null; removalRequest = null; model.clearError() })
+    } }
     ui.entries.find { it.id == notesId }?.let { entry -> key(entry.id) {
         ProductNotesDialog(entry, ProductNoteStage.COMPLETED, ui, model, onClose = { notesId = null })
     } }
@@ -111,20 +127,19 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
             }
         }, confirmButton = { TextButton(onClick = { rejectDetailsId = null }) { Text("Zamknij") } })
     }
-    ui.rejectedGoods.find { it.id == deletingId }?.let { item ->
-        AlertDialog(onDismissRequest = { if (!ui.saving) deletingId = null }, title = { Text("Usunąć wybrakowany towar?") },
-            text = { Column { Text("${decimalLabel(item.kilograms)} kg · ${queueDateLabel(item.date)}"); Text(item.description, maxLines = 4) } },
-            confirmButton = { TextButton(onClick = { model.deleteRejectedGoods(item.id); deletingId = null }, enabled = !ui.saving,
-                modifier = Modifier.testTag("rejected-delete-confirm")) { Text("Usuń") } },
-            dismissButton = { TextButton(onClick = { deletingId = null }, enabled = !ui.saving) { Text("Anuluj") } })
-    }
+    ui.rejectedGoods.find { it.id == deletingId }?.let { item -> key(removalRequest) {
+        WarehouseDeleteDialog("Usunąć wybrakowany towar?", "${decimalLabel(item.kilograms)} kg · ${queueDateLabel(item.date)}\n${item.description}",
+            ui.saving, ui.operationError, "rejected-delete-confirm",
+            onDelete = { pin -> removalRequest?.let { model.deleteRejectedGoods(it, item.id, pin) } },
+            onClose = { deletingId = null; removalRequest = null; model.clearError() })
+    } }
 }
 
 internal fun completedOrderLabel(entry: ProductionQueueEntry) = "Zamówiono: ${entry.plannedAmount?.let(::decimalLabel) ?: "—"} ${entry.unit.label}" +
     if (entry.excessAmount.signum() > 0) " + nadmiar: ${decimalLabel(entry.excessAmount)} ${entry.unit.label}" else ""
 
 @Composable
-private fun CompletedProductDetails(product: CompletedDayProduct, date: LocalDate, onClose: () -> Unit) {
+private fun CompletedProductDetails(product: CompletedDayProduct, date: LocalDate, enabled: Boolean, onDelete: () -> Unit, onClose: () -> Unit) {
     val entry = product.entry
     AlertDialog(onDismissRequest = onClose, title = { Text(entry.title) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()).testTag("completed-details"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -138,7 +153,8 @@ private fun CompletedProductDetails(product: CompletedDayProduct, date: LocalDat
             HorizontalDivider(); Text("Zapisy wykonania", fontWeight = FontWeight.Bold)
             product.receipts.forEach { receipt -> Text("${decimalLabel(receipt.amount)} ${entry.unit.label} · ${dateLabel(receipt.occurredAt)}") }
         }
-    }, confirmButton = { TextButton(onClick = onClose) { Text("Zamknij") } })
+    }, confirmButton = { TextButton(onClick = onClose) { Text("Zamknij") } },
+        dismissButton = { TextButton(onClick = onDelete, enabled = enabled, modifier = Modifier.testTag("warehouse-delete")) { Text("Usuń z magazynu") } })
 }
 
 @Composable

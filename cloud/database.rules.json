@@ -8,7 +8,7 @@
           "$domain": {
             ".read": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|10)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory')",
             ".write": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|10)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory') && ($domain == 'inventory' || $domain == 'production' || $domain == 'notes') && newData.exists() && newData.child('actor/uid').val() == auth.uid && newData.child('actor/account').val() == auth.token.account",
-            ".validate": "newData.child('schema').val() == 1 && newData.child('revision').isNumber() && newData.child('updatedAt').isNumber()",
+            ".validate": "(($domain == 'production' && newData.child('schema').val() == 2) || ($domain != 'production' && newData.child('schema').val() == 1)) && newData.child('revision').isNumber() && newData.child('updatedAt').isNumber()",
             "tables": {
               "tank_states": {
                 "$tank": {

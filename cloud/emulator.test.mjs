@@ -27,7 +27,7 @@ test('two authenticated operators see live changes, concurrent execution retries
   const orderKey = Buffer.from('order').toString('base64url');
   try {
     const first = await client('first', '01'), second = await client('second', '02');
-    await set(domain(first), { schema: 1, revision: 1, updatedAt: Date.now(), actor: actor(first), tables: {
+    await set(domain(first), { schema: 2, revision: 1, updatedAt: Date.now(), actor: actor(first), tables: {
       production_queue: { [orderKey]: { id: 'order', produced_amount: '0', planned_amount: '1000' } }
     } });
     const seen = new Promise((resolve, reject) => {
