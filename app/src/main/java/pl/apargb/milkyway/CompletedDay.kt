@@ -3,6 +3,19 @@ package pl.apargb.milkyway
 import java.math.BigDecimal
 import java.time.LocalDate
 
+internal const val WAREHOUSE_TITLE = "Magazyn/Wyprodukowano"
+
+internal enum class ProductionFulfilment { COMPLETE, PARTIAL, EXCESS, UNKNOWN }
+
+internal val ProductionQueueEntry.fulfilment: ProductionFulfilment get() {
+    val planned = plannedAmount?.takeIf { it.signum() > 0 } ?: return ProductionFulfilment.UNKNOWN
+    return when (producedAmount.compareTo(planned)) {
+        -1 -> ProductionFulfilment.PARTIAL
+        0 -> ProductionFulfilment.COMPLETE
+        else -> ProductionFulfilment.EXCESS
+    }
+}
+
 internal data class CompletedDayProduct(val entry: ProductionQueueEntry, val receipts: List<ProductionCompletion>) {
     val amount: BigDecimal get() = receipts.fold(BigDecimal.ZERO) { total, receipt -> total + receipt.amount }
 }

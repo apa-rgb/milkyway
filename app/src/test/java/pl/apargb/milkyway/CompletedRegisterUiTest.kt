@@ -117,6 +117,7 @@ class CompletedRegisterUiTest {
         compose.onNodeWithTag("completed-day-summary").assertTextEquals("Produkcja: 700 kg  |  Wybrakowane: 10 kg")
         compose.onNodeWithTag("completed-previous-day").performClick()
         compose.onNodeWithTag("completed-amount-two-days", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 300 kg")
+        compose.onNodeWithTag("completed-status-two-days", useUnmergedTree = true).assertTextEquals("Całość zamówienia")
         compose.onNodeWithTag("completed-rejected-new-reject").assertDoesNotExist()
         compose.onNodeWithTag("completed-day-summary").assertTextEquals("Produkcja: 300 kg  |  Wybrakowane: 5 kg")
         compose.activityRule.scenario.recreate()
@@ -216,6 +217,35 @@ class CompletedRegisterUiTest {
         compose.onNodeWithTag("completed-amount-swipe-product", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 700 kg")
         val after = compose.runOnIdle { Triple(model.state.value.entries, model.state.value.completions, model.state.value.rejectedGoods) }
         assertEquals(before, after)
+    }
+
+    @Test fun warehouseNameAndCompactRowsShowCompletePartialAndExcessOrdersWithDailyAmounts() {
+        ProductionQueueRepository(model.getApplication()).useForTest { repository ->
+            listOf(Triple("partial", ProductionLine.BUTTER, "400"), Triple("complete", ProductionLine.POWDER, "1000"),
+                Triple("excess", ProductionLine.UHT, "1200")).forEach { (id, line, produced) ->
+                repository.save(id, line, today, when (id) { "partial" -> "Masło częściowe"; "complete" -> "Proszek pełna partia"; else -> "UHT z nadwyżką" },
+                    "", 100L, BigDecimal("1000"))
+                repository.recordProduction("receipt-$id", id, line, today, BigDecimal(produced), 200L)
+            }
+        }
+        refresh()
+        compose.onNodeWithTag("home-Completed").assert(hasText("Magazyn/", substring = true))
+        screenshot("magazyn-przycisk-ekran-glowny")
+        compose.onNodeWithTag("home-Completed").performClick()
+        compose.onNodeWithText("Magazyn/Wyprodukowano").assertIsDisplayed()
+        compose.onNodeWithTag("completed-status-partial", useUnmergedTree = true).assertTextEquals("Brakuje: 600 kg")
+        compose.onNodeWithTag("completed-status-complete", useUnmergedTree = true).assertTextEquals("Całość zamówienia")
+        compose.onNodeWithTag("completed-order-excess", useUnmergedTree = true).assertTextEquals("Zamówiono: 1\u00a0000 l + nadmiar: 200 l")
+        compose.onNodeWithTag("completed-amount-partial", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 400 kg")
+        listOf("partial", "complete", "excess").forEach { id ->
+            compose.onNodeWithTag("completed-entry-$id").assertIsDisplayed()
+            compose.onNodeWithTag("product-notes-$id").assertIsDisplayed()
+        }
+        screenshot("magazyn-kolory-realizacji")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("completed-status-partial", useUnmergedTree = true).assertTextEquals("Brakuje: 600 kg")
+        compose.onNodeWithTag("completed-status-complete", useUnmergedTree = true).assertTextEquals("Całość zamówienia")
+        assertEquals(3, compose.runOnIdle { model.state.value.completions.size })
     }
 
     private fun ProductionQueueRepository.useForTest(action: (ProductionQueueRepository) -> Unit) {

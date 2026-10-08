@@ -72,13 +72,13 @@ internal fun ShiftSelectionCard(shift: Int, selected: Boolean, onSelect: () -> U
 
 @Composable
 internal fun HomeProductionAction(title: String, caption: String, icon: ImageVector, tone: Department,
-                                  modifier: Modifier, onClick: () -> Unit) {
+                                  modifier: Modifier, compactIcon: Boolean = false, onClick: () -> Unit) {
     Card(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = 88.dp), shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = tone.tint), border = BorderStroke(1.dp, tone.accent.copy(alpha = .2f))) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(icon, null, Modifier.size(19.dp), tint = tone.accent)
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = tone.accent)
+                Icon(icon, null, Modifier.size(if (compactIcon) 16.dp else 19.dp), tint = tone.accent)
+                Text(title.replace("/", "/\n"), fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, color = tone.accent)
             }
             Text(caption, fontSize = 11.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

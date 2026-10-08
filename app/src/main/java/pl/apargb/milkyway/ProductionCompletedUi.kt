@@ -50,22 +50,22 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
     }
     Column(Modifier.fillMaxSize().testTag("completed-page")) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Wyprodukowano", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(WAREHOUSE_TITLE, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FilledTonalButton(onClick = { model.clearError(); addingId = UUID.randomUUID().toString() }, enabled = enabled,
                 modifier = Modifier.testTag("completed-add-rejected"), contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)); Text("Wybrakowany", style = MaterialTheme.typography.labelMedium)
+                Icon(Icons.Outlined.Add, null, Modifier.size(16.dp)); Text("Wybrakowany", style = MaterialTheme.typography.labelMedium)
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { changeDay(date.minusDays(1)) }, enabled = !ui.saving && date > LocalDate.of(1900, 1, 1),
-                modifier = Modifier.testTag("completed-previous-day")) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Poprzedni dzień rejestru") }
+                modifier = Modifier.testTag("completed-previous-day")) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Poprzedni dzień rejestru", Modifier.size(18.dp)) }
             TextButton(onClick = { calendarOpen = true }, enabled = !ui.saving, modifier = Modifier.weight(1f).testTag("completed-date")) {
-                Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(queueDateLabel(date))
+                Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(queueDateLabel(date))
             }
             TextButton(onClick = { changeDay(LocalDate.now()) }, enabled = !ui.saving && date != LocalDate.now(),
                 modifier = Modifier.testTag("completed-today"), contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Dzisiaj") }
             IconButton(onClick = { changeDay(date.plusDays(1)) }, enabled = !ui.saving && date < LocalDate.of(2100, 12, 31),
-                modifier = Modifier.testTag("completed-next-day")) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Następny dzień rejestru") }
+                modifier = Modifier.testTag("completed-next-day")) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Następny dzień rejestru", Modifier.size(18.dp)) }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(department == null, onClick = { department = null }, label = { Text("Wszystkie") })

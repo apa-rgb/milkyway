@@ -52,7 +52,7 @@ private enum class Section(val title: String, val icon: ImageVector) {
     Notes("Notatki", Icons.Outlined.NoteAlt),
     Laboratory("Laboratorium", Icons.Outlined.Science),
     Production("Produkcja", Icons.Outlined.Factory),
-    Completed("Wyprodukowano", Icons.Outlined.Inventory2),
+    Completed(WAREHOUSE_TITLE, Icons.Outlined.Inventory2),
     Controls("Kontrola parametrów", Icons.Outlined.Tune)
 }
 
@@ -212,8 +212,8 @@ private fun MilkywayApp() {
                                         productionDestinationName = ProductionDestination.MENU.name
                                         sectionName = Section.Production.name
                                     }
-                                    HomeProductionAction("Wyprodukowano", "Towar gotowy i nadwyżki", Icons.Outlined.Inventory2, Department.Processing,
-                                        Modifier.testTag("home-Completed")) { sectionName = Section.Completed.name }
+                                    HomeProductionAction(Section.Completed.title, "Towar gotowy i nadwyżki", Icons.Outlined.Inventory2, Department.Processing,
+                                        Modifier.testTag("home-Completed"), compactIcon = true) { sectionName = Section.Completed.name }
                                 }
                             }
                         }

@@ -29,6 +29,13 @@ internal fun productionDayBackground(date: LocalDate, departmentTint: Color, sur
     return lerp(lerp(surface, departmentTint, .55f), shade, .42f)
 }
 
+internal val ProductionFulfilment.tint: Color get() = when (this) {
+    ProductionFulfilment.COMPLETE -> Color(0xFFE8F5EB)
+    ProductionFulfilment.PARTIAL -> Color(0xFFFFF7DE)
+    ProductionFulfilment.EXCESS -> Color(0xFFE9F2FC)
+    ProductionFulfilment.UNKNOWN -> Color(0xFFF1F3F4)
+}
+
 enum class Department(val title: String, val accent: Color, val tint: Color, val icon: ImageVector) {
     Reception("Odbieralnia", Color(0xFF245DA8), Color(0xFFEAF2FF), Icons.Outlined.LocalShipping),
     Processing("Aparatownia", Color(0xFF08796B), Color(0xFFE4F5F0), Icons.Outlined.Tune),

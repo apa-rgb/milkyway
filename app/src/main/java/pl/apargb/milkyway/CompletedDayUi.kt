@@ -44,13 +44,13 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
     BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
         // Keep readable rows on one screen; large daily registers have pages within the same day.
         val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
-        val minimumRow = 62.dp * fontScale
+        val minimumRow = 52.dp * fontScale
         val headerHeight = 44.dp * fontScale
         val pageSize = floor((maxHeight - headerHeight - 44.dp).value / (minimumRow + 4.dp).value).toInt().coerceAtLeast(1)
         val pages = ((rows.size + pageSize - 1) / pageSize).coerceAtLeast(1)
         val visiblePage = page.coerceIn(0, pages - 1)
         LaunchedEffect(pages) { page = page.coerceIn(0, pages - 1) }
-        val rowHeight = ((maxHeight - headerHeight - 44.dp) / pageSize - 4.dp).coerceIn(minimumRow, minimumRow + 12.dp)
+        val rowHeight = ((maxHeight - headerHeight - 44.dp) / pageSize - 4.dp).coerceIn(minimumRow, minimumRow + 8.dp)
         Column(Modifier.fillMaxSize().background(dayBackground, RoundedCornerShape(14.dp))) {
             Column(Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Text(queueDateLabel(date), Modifier.testTag("completed-day-$date"), style = MaterialTheme.typography.labelMedium,
@@ -66,8 +66,8 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                         val entry = product.entry
                         Surface(onClick = { onDetails(entry.id) }, enabled = enabled,
                             modifier = Modifier.fillMaxWidth().height(rowHeight).testTag("completed-entry-${entry.id}"),
-                            shape = RoundedCornerShape(10.dp), color = entry.line.tone.tint) {
-                            Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            shape = RoundedCornerShape(10.dp), color = entry.fulfilment.tint) {
+                            Row(Modifier.padding(horizontal = 10.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text(entry.title, fontWeight = FontWeight.Bold, color = entry.line.tone.accent,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
@@ -76,16 +76,23 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                                         Text("Wyprodukowano: ${decimalLabel(product.amount)} ${entry.unit.label}",
                                             Modifier.testTag("completed-amount-${entry.id}"), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                     }
-                                    if (entry.excessAmount.signum() > 0) Text(completedOrderLabel(entry),
+                                    if (entry.fulfilment == ProductionFulfilment.EXCESS) Text(completedOrderLabel(entry),
                                         Modifier.testTag("completed-order-${entry.id}"), maxLines = 1, overflow = TextOverflow.Ellipsis,
                                         style = MaterialTheme.typography.labelSmall, color = entry.line.tone.accent)
-                                    else ui.productNotes.firstOrNull { it.entryId == entry.id }?.let {
-                                        Text(it.text, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
+                                    else {
+                                        val status = when (entry.fulfilment) {
+                                            ProductionFulfilment.COMPLETE -> "Całość zamówienia"
+                                            ProductionFulfilment.PARTIAL -> "Brakuje: ${entry.remainingAmount?.let(::decimalLabel)} ${entry.unit.label}"
+                                            else -> "Plan do uzupełnienia"
+                                        }
+                                        val note = ui.productNotes.firstOrNull { it.entryId == entry.id }?.text
+                                        Text(status + (note?.let { " · $it" } ?: ""), Modifier.testTag("completed-status-${entry.id}"),
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                                 IconButton(onClick = { onNotes(entry.id) }, enabled = enabled,
-                                    modifier = Modifier.size(40.dp).testTag("product-notes-${entry.id}")) {
-                                    Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(20.dp), tint = entry.line.tone.accent)
+                                    modifier = Modifier.size(32.dp).testTag("product-notes-${entry.id}")) {
+                                    Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(16.dp), tint = entry.line.tone.accent)
                                 }
                             }
                         }
@@ -94,9 +101,9 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                         Surface(onClick = { onRejectedDetails(item.id) }, enabled = enabled,
                             modifier = Modifier.fillMaxWidth().height(rowHeight).testTag("completed-rejected-${item.id}"),
                             shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.errorContainer.copy(alpha = .5f)) {
-                            Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.WarningAmber, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                                Spacer(Modifier.width(8.dp))
+                            Row(Modifier.padding(horizontal = 10.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.WarningAmber, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.width(6.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(item.description, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelLarge)
@@ -104,8 +111,8 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                                         Modifier.testTag("rejected-amount-${item.id}"), style = MaterialTheme.typography.labelSmall)
                                 }
                                 IconButton(onClick = { onDeleteRejected(item.id) }, enabled = enabled,
-                                    modifier = Modifier.size(40.dp).testTag("rejected-delete-${item.id}")) {
-                                    Icon(Icons.Outlined.DeleteOutline, "Usuń wybrakowany towar", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.error)
+                                    modifier = Modifier.size(32.dp).testTag("rejected-delete-${item.id}")) {
+                                    Icon(Icons.Outlined.DeleteOutline, "Usuń wybrakowany towar", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
@@ -114,11 +121,11 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
             }
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 IconButton(onClick = { page = visiblePage - 1 }, enabled = enabled && visiblePage > 0, modifier = Modifier.testTag("completed-previous-page")) {
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Poprzednia strona dnia")
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Poprzednia strona dnia", Modifier.size(18.dp))
                 }
                 Text("${rows.size} pozycji · Strona ${visiblePage + 1}/$pages", Modifier.testTag("completed-page-number"), style = MaterialTheme.typography.labelSmall)
                 IconButton(onClick = { page = visiblePage + 1 }, enabled = enabled && visiblePage < pages - 1, modifier = Modifier.testTag("completed-next-page")) {
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Następna strona dnia")
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Następna strona dnia", Modifier.size(18.dp))
                 }
             }
         }
