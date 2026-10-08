@@ -27,8 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -259,12 +257,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                         }) { index ->
                             val day = startDate.plusDays((index / 13).toLong())
                             val entries = activeByDay[day].orEmpty()
-                            val dayShade = when (Math.floorMod(day.toEpochDay(), 3L)) {
-                                0L -> Color(0xFFDCE9F5)
-                                1L -> line.tone.tint
-                                else -> Color(0xFFDDEFE4)
-                            }
-                            val dayBackground = lerp(lerp(MaterialTheme.colorScheme.surface, line.tone.tint, .55f), dayShade, .32f)
+                            val dayBackground = productionDayBackground(day, line.tone.tint, MaterialTheme.colorScheme.surface)
                             if (index % 13 == 0) {
                                 Column(Modifier.fillMaxWidth().testTag("queue-day-$day")
                                     .background(dayBackground, RoundedCornerShape(12.dp)), verticalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -13,10 +13,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.LocalDate
+
+internal fun productionDayBackground(date: LocalDate, departmentTint: Color, surface: Color): Color {
+    val shade = when (Math.floorMod(date.toEpochDay(), 3L)) {
+        0L -> Color(0xFFDCE9F5)
+        1L -> Color(0xFFF6E7D7)
+        else -> Color(0xFFDDEFE4)
+    }
+    return lerp(lerp(surface, departmentTint, .55f), shade, .42f)
+}
 
 enum class Department(val title: String, val accent: Color, val tint: Color, val icon: ImageVector) {
     Reception("Odbieralnia", Color(0xFF245DA8), Color(0xFFEAF2FF), Icons.Outlined.LocalShipping),

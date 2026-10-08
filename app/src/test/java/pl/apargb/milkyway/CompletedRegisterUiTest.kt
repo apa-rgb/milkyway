@@ -172,6 +172,52 @@ class CompletedRegisterUiTest {
         compose.onNodeWithTag("completed-page-number").assert(hasText("Strona 1/", substring = true))
     }
 
+    @Test fun verticalSwipesFollowDaysSynchronizeCalendarAndKeepDailyDataAndSelectionAfterRotation() {
+        var executionDay = today.minusDays(1)
+        ProductionQueueRepository(model.getApplication(), today = { executionDay }).useForTest { repository ->
+            repository.save("swipe-product", ProductionLine.BUTTER, executionDay, "Masło z dwóch dni", "Opis", 100L, BigDecimal("1000"))
+            repository.recordProduction("old-production", "swipe-product", ProductionLine.BUTTER, executionDay, BigDecimal("300"), 101L)
+            repository.addRejectedGoods("old-brak", ProductionLine.BUTTER, executionDay, "Wczorajszy brak", BigDecimal("25"), 102L)
+            executionDay = today
+            repository.schedule(repository.load().single(), today, LocalTime.NOON, 200L)
+            repository.recordProduction("new-production", "swipe-product", ProductionLine.BUTTER, today, BigDecimal("700"), 201L)
+            repository.addRejectedGoods("new-brak", ProductionLine.BUTTER, today, "Dzisiejszy brak", BigDecimal("10"), 202L)
+            repository.addRejectedGoods("next-brak", ProductionLine.UHT, today.plusDays(1), "Brak na następny dzień", BigDecimal("5"), 300L)
+        }
+        refresh(); compose.onNodeWithTag("home-Completed").performClick()
+        val before = compose.runOnIdle { Triple(model.state.value.entries, model.state.value.completions, model.state.value.rejectedGoods) }
+        compose.onNodeWithTag("completed-days").performTouchInput { swipeUp(durationMillis = 1000) }
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(today.plusDays(1))))
+        compose.onNodeWithTag("completed-day-summary").assertTextEquals("Produkcja: 0  |  Wybrakowane: 5 kg")
+        compose.onNodeWithTag("completed-entry-swipe-product").assertDoesNotExist()
+        screenshot("wyprodukowano-przewijanie-nastepny-dzien")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(today.plusDays(1))))
+        compose.onNodeWithTag("completed-date").performClick()
+        val label = today.plusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", java.util.Locale.US))
+        compose.onNode(hasText(label, substring = true) and isSelected() and hasAnyAncestor(hasTestTag("queue-calendar"))).assertExists()
+        compose.onNodeWithText("Anuluj").performClick()
+        compose.onNodeWithTag("completed-days").performTouchInput { swipeDown(durationMillis = 1000) }
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(today)))
+        compose.onNodeWithTag("completed-amount-swipe-product", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 700 kg")
+        screenshot("wyprodukowano-przewijanie-dzisiaj")
+        compose.onNodeWithTag("completed-days").performTouchInput { swipeDown(durationMillis = 1000) }
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(today.minusDays(1))))
+        compose.onNodeWithTag("completed-amount-swipe-product", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 300 kg")
+        compose.onNodeWithTag("completed-day-summary").assertTextEquals("Produkcja: 300 kg  |  Wybrakowane: 25 kg")
+        compose.onNodeWithTag("completed-filter-UHT").performScrollTo().performClick()
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(today.minusDays(1))))
+        compose.onNodeWithText("Brak wyprodukowanego towaru").assertExists()
+        compose.onNodeWithTag("completed-days").performTouchInput { swipeUp(durationMillis = 1000) }
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(today)))
+        compose.onNodeWithText("Brak wyprodukowanego towaru").assertExists()
+        compose.onNodeWithTag("completed-today").assertIsNotEnabled()
+        compose.onNodeWithText("Wszystkie").performScrollTo().performClick()
+        compose.onNodeWithTag("completed-amount-swipe-product", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 700 kg")
+        val after = compose.runOnIdle { Triple(model.state.value.entries, model.state.value.completions, model.state.value.rejectedGoods) }
+        assertEquals(before, after)
+    }
+
     private fun ProductionQueueRepository.useForTest(action: (ProductionQueueRepository) -> Unit) {
         try { action(this) } finally { close() }
     }
