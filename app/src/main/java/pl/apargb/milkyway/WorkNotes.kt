@@ -18,7 +18,7 @@ enum class NoteKind(val title: String, val addLabel: String) {
 data class WorkNote(val id: String, val scope: Int, val kind: NoteKind, val title: String, val body: String,
                     val completed: Boolean, val createdAt: Long, val updatedAt: Long)
 
-internal class WorkNotesDatabase(context: Context) : SQLiteOpenHelper(context, NAME, null, 1) {
+internal class WorkNotesDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 1) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE work_notes (
             id TEXT PRIMARY KEY, scope INTEGER NOT NULL CHECK(scope BETWEEN 0 AND 3),
@@ -32,8 +32,7 @@ internal class WorkNotesDatabase(context: Context) : SQLiteOpenHelper(context, N
     companion object { const val NAME = "work_notes.db" }
 }
 
-internal class WorkNotesRepository(context: Context) {
-    private val helper = WorkNotesDatabase(context)
+internal class WorkNotesRepository(context: Context, private val helper: WorkNotesDatabase = WorkNotesDatabase(context)) {
 
     @Synchronized fun load(): List<WorkNote> = helper.readableDatabase.query("work_notes", null,
         null, null, null, null, "updated_at DESC, rowid DESC").use { cursor ->

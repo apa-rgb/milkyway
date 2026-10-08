@@ -1,0 +1,7 @@
+# Copy to firebase.properties after creating your Firebase project.
+# These Firebase Android configuration values are public identifiers, not account passwords.
+projectId=
+apiKey=
+applicationId=
+databaseUrl=
+plantId=default

@@ -4,3 +4,10 @@
 local.properties
 **/build/
 *.iml
+firebase.properties
+app/google-services.json
+cloud/accounts*.csv
+cloud/.venv/
+cloud/node_modules/
+cloud/*-debug.log
+cloud/.firebase/

@@ -12,7 +12,7 @@ data class InventoryOverview(val states: Map<String, TankStatus>, val latest: Ma
 
 internal data class TopUpsPage(val events: List<Movement>, val nextBeforeRowId: Long?, val totalCount: Int)
 
-internal class InventoryDatabase(context: Context) : SQLiteOpenHelper(context, NAME, null, 6) {
+internal class InventoryDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 6) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE tank_states (
             tank_id TEXT PRIMARY KEY, litres TEXT, brix TEXT, ph TEXT, sh TEXT, temperature TEXT, filled_at INTEGER,

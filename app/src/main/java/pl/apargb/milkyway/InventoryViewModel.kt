@@ -39,10 +39,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     init { reload() }
 
     fun reload() {
+        if (mutableState.value.saving) return
         mutableState.value = mutableState.value.copy(loading = true, loadError = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { repository.load() } }
-                .onSuccess { mutableState.value = InventoryUiState(overview = it, loading = false) }
+            runCatching { withContext(Dispatchers.IO) { CloudAccess.inventory(getApplication(), repository) { it.load() } } }
+                .onSuccess { mutableState.value = mutableState.value.copy(overview = it, loading = false) }
                 .onFailure { mutableState.value = mutableState.value.copy(loading = false, loadError = "Nie udało się odczytać danych. Spróbuj ponownie.") }
         }
     }
@@ -54,7 +55,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         if (mutableState.value.saving || mutableState.value.loading || mutableState.value.loadError != null) return
         mutableState.value = mutableState.value.copy(saving = true, operationError = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { repository.apply(requestId, operation) } }
+            runCatching { withContext(Dispatchers.IO) { CloudAccess.inventory(getApplication(), repository, mutation = true) { it.apply(requestId, operation) } } }
                 .onSuccess {
                     mutableState.value = mutableState.value.copy(overview = it, saving = false, lastSavedRequestId = requestId)
                 }
@@ -68,7 +69,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     fun showHistory(tankId: String) {
         mutableHistory.value = HistoryUiState(tankId, loading = true)
         viewModelScope.launch {
-            val result = runCatching { withContext(Dispatchers.IO) { repository.history(tankId) } }
+            val result = runCatching { withContext(Dispatchers.IO) { CloudAccess.inventory(getApplication(), repository) { it.history(tankId) } } }
             if (mutableHistory.value.tankId == tankId) {
                 mutableHistory.value = result.fold(
                     { HistoryUiState(tankId, events = it) },
@@ -93,7 +94,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         val generation = topUpsGeneration
         mutableTopUps.value = current.copy(loading = true, error = null)
         viewModelScope.launch {
-            val result = runCatching { withContext(Dispatchers.IO) { repository.topUps(tankId, current.nextBeforeRowId) } }
+            val result = runCatching { withContext(Dispatchers.IO) { CloudAccess.inventory(getApplication(), repository) { it.topUps(tankId, current.nextBeforeRowId) } } }
             if (generation == topUpsGeneration) {
                 mutableTopUps.value = result.fold(
                     { current.copy(loading = false, events = current.events + it.events,

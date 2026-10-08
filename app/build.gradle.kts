@@ -1,8 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val firebaseConfig = Properties().apply {
+    rootProject.file("firebase.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+fun firebaseValue(key: String) = "\"" + firebaseConfig.getProperty(key, "").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "pl.apargb.milkyway"
@@ -11,10 +18,15 @@ android {
         applicationId = "pl.apargb.milkyway"
         minSdk = 26
         targetSdk = 35
-        versionCode = 26
-        versionName = "0.6.14"
+        versionCode = 27
+        versionName = "0.7.0"
+        buildConfigField("String", "FIREBASE_PROJECT_ID", firebaseValue("projectId"))
+        buildConfigField("String", "FIREBASE_API_KEY", firebaseValue("apiKey"))
+        buildConfigField("String", "FIREBASE_APP_ID", firebaseValue("applicationId"))
+        buildConfigField("String", "FIREBASE_DATABASE_URL", firebaseValue("databaseUrl"))
+        buildConfigField("String", "FIREBASE_PLANT_ID", firebaseValue("plantId"))
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -24,6 +36,9 @@ android {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-database")
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")

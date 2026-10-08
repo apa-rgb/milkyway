@@ -24,7 +24,7 @@ class WorkNotesViewModel(application: Application) : AndroidViewModel(applicatio
         if (mutableState.value.saving) return
         mutableState.value = mutableState.value.copy(loading = true, loadError = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { repository.load() } }
+            runCatching { withContext(Dispatchers.IO) { CloudAccess.notes(getApplication(), repository) { it.load() } } }
                 .onSuccess { mutableState.value = mutableState.value.copy(notes = it, loading = false) }
                 .onFailure { mutableState.value = mutableState.value.copy(loading = false, loadError = "Nie udało się odczytać wpisów. Spróbuj ponownie.") }
         }
@@ -33,16 +33,16 @@ class WorkNotesViewModel(application: Application) : AndroidViewModel(applicatio
     fun clearError() { mutableState.value = mutableState.value.copy(operationError = null) }
 
     fun save(requestId: String, id: String, scope: Int, kind: NoteKind, title: String, body: String) = mutate(requestId) {
-        repository.save(id, scope, kind, title, body, System.currentTimeMillis())
+        it.save(id, scope, kind, title, body, System.currentTimeMillis())
     }
-    fun setCompleted(note: WorkNote, completed: Boolean) = mutate { repository.setCompleted(note, completed, System.currentTimeMillis()) }
-    fun delete(note: WorkNote) = mutate { repository.delete(note) }
+    fun setCompleted(note: WorkNote, completed: Boolean) = mutate { it.setCompleted(note, completed, System.currentTimeMillis()) }
+    fun delete(note: WorkNote) = mutate { it.delete(note) }
 
-    private fun mutate(requestId: String? = null, action: () -> List<WorkNote>) {
+    private fun mutate(requestId: String? = null, action: (WorkNotesRepository) -> List<WorkNote>) {
         if (mutableState.value.loading || mutableState.value.saving || mutableState.value.loadError != null) return
         mutableState.value = mutableState.value.copy(saving = true, operationError = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { action() } }
+            runCatching { withContext(Dispatchers.IO) { CloudAccess.notes(getApplication(), repository, mutation = true, operation = action) } }
                 .onSuccess { mutableState.value = mutableState.value.copy(notes = it, saving = false,
                     lastSavedRequestId = requestId ?: mutableState.value.lastSavedRequestId) }
                 .onFailure { mutableState.value = mutableState.value.copy(saving = false,

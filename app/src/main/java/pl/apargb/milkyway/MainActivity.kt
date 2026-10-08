@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme(colorScheme = MilkywayColors) { MilkywayApp() }
+            MaterialTheme(colorScheme = MilkywayColors) { MilkywayRoot() }
         }
     }
 }
@@ -58,7 +59,7 @@ private enum class Section(val title: String, val icon: ImageVector) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MilkywayApp() {
+internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
     val inventoryModel: InventoryViewModel = viewModel()
     val inventory by inventoryModel.state.collectAsState()
     val history by inventoryModel.history.collectAsState()
@@ -69,6 +70,14 @@ private fun MilkywayApp() {
     val assumptions by productionModel.state.collectAsState()
     val queueModel: ProductionQueueViewModel = viewModel()
     val queue by queueModel.state.collectAsState()
+    val saving = inventory.saving || notes.saving || queue.saving
+    LaunchedEffect(cloud.uid, cloud.revision, saving) {
+        if (cloud.configured && cloud.ready && !saving) {
+            inventoryModel.reload(); notesModel.reload(); queueModel.reload()
+            history.tankId?.let(inventoryModel::showHistory)
+            topUps.tankId?.let(inventoryModel::showTopUps)
+        }
+    }
     var labUnlocked by remember { mutableStateOf(false) }
     var editorTankId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorMode by rememberSaveable { mutableStateOf(TankEditor.STATE.name) }
@@ -137,12 +146,16 @@ private fun MilkywayApp() {
                     })
                 }
             }, actions = {
+                if (cloud.configured) IconButton(onClick = session::signOut, enabled = !saving, modifier = Modifier.testTag("cloud-sign-out")) {
+                    Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = "Wyloguj konto ${cloud.number}")
+                }
                 if (section == Section.Laboratory && labUnlocked) IconButton(onClick = { labUnlocked = false }) {
                     Icon(Icons.Outlined.Lock, contentDescription = "Zablokuj laboratorium")
                 }
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = if (section == Section.Home || section == Section.Dashboard)
                 MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.background))
-        }
+        },
+        bottomBar = { if (cloud.configured || section == Section.Home) CloudStatus(cloud, saving) }
     ) { padding ->
         if (section == Section.Tanks) {
             Box(Modifier.fillMaxSize().padding(padding)) {
@@ -154,7 +167,9 @@ private fun MilkywayApp() {
             }
         } else if (section == Section.Laboratory) {
             Box(Modifier.fillMaxSize().padding(padding)) {
-                if (labUnlocked) LaboratoryPage(inventory, inventoryModel, selectedShift, inventoryModel::reload)
+                if (cloud.configured && !cloud.laboratory) {
+                    Text("To konto jest operatorem. Pomiary laboratoryjne wymagają konta z uprawnieniami Laboratorium.", Modifier.padding(24.dp))
+                } else if (labUnlocked) LaboratoryPage(inventory, inventoryModel, selectedShift, inventoryModel::reload)
                 else LaboratoryLockPage(onUnlock = { labUnlocked = true })
             }
         } else if (section == Section.Completed) {

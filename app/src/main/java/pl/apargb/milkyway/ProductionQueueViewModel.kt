@@ -30,7 +30,7 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
         if (mutableState.value.saving) return
         mutableState.value = mutableState.value.copy(loading = true, loadError = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { repository.snapshot() } }
+            runCatching { withContext(Dispatchers.IO) { CloudAccess.production(getApplication(), repository) { it.snapshot() } } }
                 .onSuccess { mutableState.value = mutableState.value.copy(entries = it.entries, completions = it.completions,
                     productNotes = it.productNotes, rejectedGoods = it.rejectedGoods, loading = false) }
                 .onFailure { mutableState.value = mutableState.value.copy(loading = false,
@@ -42,44 +42,44 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
 
     fun save(requestId: String, id: String, line: ProductionLine, date: LocalDate, title: String, description: String, plannedAmount: BigDecimal,
              pendingOrder: Boolean? = null, scheduledTime: LocalTime? = null) = mutate(requestId) {
-        repository.save(id, line, date, title, description, System.currentTimeMillis(), plannedAmount, pendingOrder, scheduledTime)
+        it.save(id, line, date, title, description, System.currentTimeMillis(), plannedAmount, pendingOrder, scheduledTime)
     }
 
     fun schedule(entry: ProductionQueueEntry, date: LocalDate, time: LocalTime) = mutate {
-        repository.schedule(entry, date, time, System.currentTimeMillis())
+        it.schedule(entry, date, time, System.currentTimeMillis())
     }
 
     fun returnToPending(entry: ProductionQueueEntry) = mutate {
-        repository.returnToPending(entry, System.currentTimeMillis())
+        it.returnToPending(entry, System.currentTimeMillis())
     }
 
     fun addProductNote(requestId: String, entry: ProductionQueueEntry, stage: ProductNoteStage, text: String) = mutate(requestId) {
-        repository.addProductNote(requestId, entry, stage, text, System.currentTimeMillis())
+        it.addProductNote(requestId, entry, stage, text, System.currentTimeMillis())
     }
 
     fun recordProduction(requestId: String, entry: ProductionQueueEntry, amount: BigDecimal?) = mutate(requestId) {
-        repository.recordProduction(requestId, entry.id, entry.line, entry.date, amount, System.currentTimeMillis())
+        it.recordProduction(requestId, entry.id, entry.line, entry.date, amount, System.currentTimeMillis())
     }
 
     fun showError(message: String) { mutableState.value = mutableState.value.copy(operationError = message) }
 
     fun move(entry: ProductionQueueEntry, direction: Int) = mutate {
-        repository.move(entry.id, entry.line, entry.date, direction, System.currentTimeMillis())
+        it.move(entry.id, entry.line, entry.date, direction, System.currentTimeMillis())
     }
 
-    fun delete(entry: ProductionQueueEntry) = mutate { repository.delete(entry) }
+    fun delete(entry: ProductionQueueEntry) = mutate { it.delete(entry) }
 
     fun addRejectedGoods(id: String, line: ProductionLine, date: LocalDate, description: String, kilograms: BigDecimal) = mutate(id) {
-        repository.addRejectedGoods(id, line, date, description, kilograms, System.currentTimeMillis())
+        it.addRejectedGoods(id, line, date, description, kilograms, System.currentTimeMillis())
     }
 
-    fun deleteRejectedGoods(id: String) = mutate { repository.deleteRejectedGoods(id) }
+    fun deleteRejectedGoods(id: String) = mutate { it.deleteRejectedGoods(id) }
 
-    private fun mutate(requestId: String? = null, action: () -> List<ProductionQueueEntry>) {
+    private fun mutate(requestId: String? = null, action: (ProductionQueueRepository) -> List<ProductionQueueEntry>) {
         if (mutableState.value.loading || mutableState.value.saving || mutableState.value.loadError != null) return
         mutableState.value = mutableState.value.copy(saving = true, operationError = null)
         viewModelScope.launch {
-            runCatching { withContext(Dispatchers.IO) { action(); repository.snapshot() } }
+            runCatching { withContext(Dispatchers.IO) { CloudAccess.production(getApplication(), repository, mutation = true) { action(it); it.snapshot() } } }
                 .onSuccess { mutableState.value = mutableState.value.copy(entries = it.entries, completions = it.completions,
                     productNotes = it.productNotes, rejectedGoods = it.rejectedGoods, saving = false,
                     lastSavedRequestId = requestId ?: mutableState.value.lastSavedRequestId) }

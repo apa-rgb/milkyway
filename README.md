@@ -1,5 +1,7 @@
 # Milkyway — aplikacja Android
 
+Wersja **0.7.0** zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
+
 Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
 
 - **Start:** uporządkowany ekran z datą, subtelną krówką i trzema przyciskami zmian; wybór jednej z trzech zmian otwiera osobny panel z nagłówkiem aktywnej zmiany, polem Notatki i sześcioma kafelkami: Zbiorniki, Produkcja, Laboratorium, Kontrola parametrów, Przypomnienia i Softlab. Wybór i bieżący ekran zachowują się przy obracaniu telefonu. Strzałka prowadzi do panelu lub wyboru zmiany.
@@ -15,7 +17,7 @@ Dane 46 zbiorników pochodzą z arkusza `Zbiorniki.xlsx`. Działy są dostępne 
 
 ## Przypomnienia, kontrola i bieżące notatki
 
-Wpisy są przypisane do wybranej zmiany i sekcji; przełączenie zmiany pokazuje jej własne przypomnienia i notatki. Tytuł może mieć do 120 znaków, treść do 10 000. Dotknięcie wpisu otwiera edycję, checkbox oznacza wykonanie przypomnienia, a ikona kosza umożliwia usunięcie po potwierdzeniu. Notatki i data ostatniej zmiany zapisują się lokalnie w osobnej bazie SQLite i pozostają po ponownym uruchomieniu aplikacji. Stany zbiorników są wspólne dla wszystkich zmian.
+Wpisy są przypisane do wybranej zmiany i sekcji; przełączenie zmiany pokazuje jej własne przypomnienia i notatki. Tytuł może mieć do 120 znaków, treść do 10 000. Dotknięcie wpisu otwiera edycję, checkbox oznacza wykonanie przypomnienia, a ikona kosza umożliwia usunięcie po potwierdzeniu. W trybie lokalnym notatki i data ostatniej zmiany zapisują się w osobnej bazie SQLite. Po podłączeniu Firebase wpisy korzystają ze wspólnej bazy zakładu. Stany zbiorników są wspólne dla wszystkich zmian.
 
 ## Laboratorium i pochodzenie pomiarów
 
@@ -23,7 +25,7 @@ Laboratorium umożliwia zapis Brix (w masłowni: tłuszczu), pH, SH i temperatur
 
 Zielony znacznik **LAB** przy zbiorniku oznacza, że jego bieżące pomiary zapisano przez Laboratorium. Jest widoczny w zwykłej liście, szczegółach, Laboratorium i Produkcji. Korekta samej ilości lub opisu zachowuje oznaczenie. Ręczna zmiana pomiarów, dopływ materiału lub pełne opróżnienie je usuwa; poprzednie pomiary i ich pochodzenie pozostają w historii. Aktualizacja aplikacji nie oznacza starszych ręcznych pomiarów jako laboratoryjnych.
 
-PIN jest lokalną blokadą ekranu Laboratorium. Powrót do panelu, przejście aplikacji w tło i odtworzenie aktywności blokują dostęp ponownie; PIN i odblokowanie nie są zapisywane. Ekran Laboratorium blokuje zrzuty ekranu. Blokada tego ekranu nie szyfruje bazy ani nie zmienia dostępnej wcześniej ręcznej edycji zbiorników.
+PIN jest lokalną blokadą ekranu Laboratorium. W trybie Firebase potrzebne są także uprawnienia konta Laboratorium; wszystkie przygotowane konta 01–10 są operatorami. Powrót do panelu, przejście aplikacji w tło i odtworzenie aktywności blokują dostęp ponownie; PIN i odblokowanie nie są zapisywane. Ekran Laboratorium blokuje zrzuty ekranu. Blokada tego ekranu nie szyfruje bazy ani nie zmienia dostępnej wcześniej ręcznej edycji zbiorników.
 
 ## Przybliżona produkcja
 
@@ -43,7 +45,7 @@ Przytrzymaj podłużny kafelek i przeciągnij go z prawej na wybraną godzinę p
 
 **Zaplanuj** przy zamówieniu pozwala wybrać dzień kalendarzem i wpisać dokładną godzinę **HH:mm**, np. **08:30**. Dotknięcie kafelka otwiera edycję produktu, ilości, uwag i terminu. W formularzu można też od razu wybrać **Produkcja**. Kolejność odpowiada godzinom; strzałki przy kafelkach przesuwają pozycje w obrębie tego samego terminu. Kilka pozycji może mieć tę samą godzinę. Starsze plany pozostają po lewej w sekcji **Bez godziny**; aktualizacja zachowuje ich ilości, kolejność i wykonanie. Produkt można cofnąć do **Wpłynęło zamówienie**, przeciągając kafelek z lewej do prawej kolumny albo dotykając **Do oczekujących**. Cofnięcie usuwa przypisanie do godziny i dnia produkcji. Przy częściowym wykonaniu oczekuje tylko pozostała ilość (np. **600 kg** z zamówionych **1000 kg**, gdy **400 kg** już wyprodukowano), a zapis wykonania pozostaje w katalogu **Magazyn/Wyprodukowano**. Notatki, opis i zamówiona ilość są zachowane; kafelek można później zaplanować ponownie na dowolny dzień i godzinę. Ta opcja działa również dla starszych pozycji bez godziny. Produkty wyprodukowane w całości pozostają w katalogu.
 
-Zamówienia, daty, godziny i kolejność zapisują się lokalnie w SQLite i pozostają po ponownym uruchomieniu. Zmiana terminu zachowuje opis, plan, wykonanie i historyczną datę zapisów produkcji. Usuwanie wymaga potwierdzenia. Planowanie nie aktualizuje ilości w zbiornikach.
+Zamówienia, daty, godziny i kolejność pozostają po ponownym uruchomieniu: w trybie lokalnym są w SQLite, a po skonfigurowaniu Firebase we wspólnej bazie. Zmiana terminu zachowuje opis, plan, wykonanie i historyczną datę zapisów produkcji. Usuwanie wymaga potwierdzenia. Planowanie nie aktualizuje ilości w zbiornikach.
 
 Przy pozycjach **bieżącego dnia** przycisk **Wyprodukowano** lub przytrzymanie towaru w produkcji pozwala wpisać wykonaną ilość. Przytrzymanie otwiera dymek z polem ilości i podglądem pozostałej produkcji oraz nadwyżki. Przesunięcie przytrzymanego kafelka zamyka dymek i rozpoczyna przeciąganie na nowy termin. **W całości** uzupełnia pozostałą ilość. Dymek i formularz zachowują wpisaną ilość po obrocie telefonu.
 
@@ -71,7 +73,7 @@ Notatki są związane z produktem, więc pozostają po zaplanowaniu zamówienia,
 
 Działy mają stałe kolory i podpisy: odbieralnia — niebieski, aparatownia — turkusowy, masłownia — bursztynowy, proszkownia — fioletowy, oleje — różowy. Każdy dział ma osobną stronę przełączaną pięcioma obramowanymi zakładkami w dwóch rzędach nad listą. Pełne nazwy działów mają większą czcionkę, a wybrany dział — mocniejszą ramkę i pastelowe tło. Zbiorniki są pokazane w zwartych wierszach: nazwa, podgląd opisu lub wpisanej zawartości oraz stan i pojemność w litrach. Przy stanie 0 l pojawia się zielony napis „pusty”; nieznany stan jest nadal oznaczony jako nieustalony. Wysokość wierszy dopasowuje się do liczby zbiorników i miejsca na ekranie; na mniejszych ekranach lista jest przewijalna. W każdym wierszu widać pH, Brix i temperaturę w °C; w masłowni Brix zastępuje procent tłuszczu. Brak pomiaru jest oznaczony „—”. Pełny opis, pozostałe pomiary, data napełnienia i przyciski operacji są dostępne po dotknięciu wiersza. Mały znacznik trasy w proszkowni można też zmieniać bezpośrednio z listy.
 
-W ostatniej zakładce **Oleje** dotknij pola „Rodzaj” lub oznaczenia rodzaju w szczegółach, aby wpisać rodzaj oleju przy danym zbiorniku. Jest to niezależne oznaczenie, które można zapisać przed ustaleniem ilości i zachować po opróżnieniu. Puste pole usuwa oznaczenie. Zmiany są zapisywane lokalnie i trafiają do historii, bez zmiany ilości lub daty napełnienia.
+W ostatniej zakładce **Oleje** dotknij pola „Rodzaj” lub oznaczenia rodzaju w szczegółach, aby wpisać rodzaj oleju przy danym zbiorniku. Jest to niezależne oznaczenie, które można zapisać przed ustaleniem ilości i zachować po opróżnieniu. Puste pole usuwa oznaczenie. Zmiany trafiają do historii, bez zmiany ilości lub daty napełnienia; w trybie chmurowym są wspólne dla telefonów.
 
 W masłowni pole **Tłuszcz [%]** zastępuje Brix w edycji, napełnianiu i szczegółach zbiornika. Przy przenoszeniu materiału pomiar jest dopasowany do zbiornika docelowego. Procent tłuszczu ma zakres 0–100 i jest zapisywany osobno w stanie oraz historii. Starsze pomiary Brix pozostają w historii jako Brix; nie są przeliczane ani przedstawiane jako tłuszcz.
 
@@ -89,7 +91,7 @@ Ilości przy edycji, napełnianiu i przenoszeniu wpisuje się w metrach szeście
 
 Data napełnienia oznacza czas ostatniego zapisanego dopływu (także pierwszego ustalenia dodatniego stanu lub jego zwiększenia); edycja samych pomiarów i zmniejszenie stanu jej nie zmieniają. Pełne opróżnienie usuwa bieżącą datę i pomiary; historia pozostaje. Daty są wyświetlane w strefie czasowej telefonu.
 
-Pomiary i opis po napełnieniu wpisuje użytkownik. Przy wyborze pustego zbiornika jako celu opis materiału jest wstępnie kopiowany ze źródła i można go poprawić. Przy dostawie z zewnątrz formularz podpowiada bieżący opis, a przy transferze do niepustego celu wpisz nowy opis; aplikacja nie zakłada rodzaju mieszaniny ani nie wylicza jej parametrów. Puste pola pomiarów oznaczają brak pomiaru dla nowej zawartości. Stan i historia są zapisywane razem w transakcji SQLite, lokalnie na urządzeniu. Powtórzenie tego samego zapisu nie nalicza transferu ponownie. Synchronizacja między telefonami nie jest zaimplementowana.
+Pomiary i opis po napełnieniu wpisuje użytkownik. Przy wyborze pustego zbiornika jako celu opis materiału jest wstępnie kopiowany ze źródła i można go poprawić. Przy dostawie z zewnątrz formularz podpowiada bieżący opis, a przy transferze do niepustego celu wpisz nowy opis; aplikacja nie zakłada rodzaju mieszaniny ani nie wylicza jej parametrów. Puste pola pomiarów oznaczają brak pomiaru dla nowej zawartości. Stan i historia są zapisywane razem: lokalnie w transakcji SQLite, a po skonfigurowaniu chmury w transakcji Firebase. Powtórzenie tego samego zapisu nie nalicza transferu ponownie. Synchronizacja między telefonami wymaga aktywnego projektu Firebase i zalogowania do tego samego zakładu.
 
 Ikona aplikacji przedstawia wesołą krówkę na przezroczystym tle. Adaptacyjna ikona zachowuje margines dla okrągłych i innych masek launchera Androida. Launcher telefonu może dodać własne tło pod przezroczystą ikoną.
 

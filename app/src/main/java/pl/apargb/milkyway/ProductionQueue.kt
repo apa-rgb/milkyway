@@ -38,7 +38,7 @@ data class RejectedGoods(val id: String, val line: ProductionLine, val date: Loc
 internal data class ProductionQueueSnapshot(val entries: List<ProductionQueueEntry>, val completions: List<ProductionCompletion>,
                                             val productNotes: List<ProductNote>, val rejectedGoods: List<RejectedGoods>)
 
-internal class ProductionQueueDatabase(context: Context) : SQLiteOpenHelper(context, NAME, null, 5) {
+internal class ProductionQueueDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 5) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE production_queue (
             id TEXT PRIMARY KEY, line TEXT NOT NULL CHECK(line IN ('BUTTER', 'POWDER', 'UHT')),
