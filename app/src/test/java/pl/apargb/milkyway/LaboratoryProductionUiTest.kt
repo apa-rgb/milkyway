@@ -121,11 +121,22 @@ class LaboratoryProductionUiTest {
         compose.onNodeWithText("Zmiana 1").performClick()
         compose.onNodeWithTag("menu-Controls").performScrollTo().performClick()
         compose.onNodeWithTag("control-PRODUCTION").performClick()
-        listOf("tanks", "queue", "notes").forEach { compose.onNodeWithTag("production-$it").assertIsDisplayed() }
-        compose.onNodeWithTag("production-notes").performClick()
+        compose.onNodeWithTag("production-queue").assertIsDisplayed()
+        listOf("tanks", "notes").forEach { compose.onNodeWithTag("production-$it").assertDoesNotExist() }
+        compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
+        compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
+        compose.onNodeWithContentDescription("Zmień zmianę").performClick()
+        compose.onNodeWithTag("home-Other").assertIsDisplayed().performClick()
+        listOf("tanks", "notes").forEach { compose.onNodeWithTag("other-$it").assertIsDisplayed() }
+        compose.onNodeWithTag("production-queue").assertDoesNotExist()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("other-menu").assertExists()
+        screenshot("menu-inne")
+        compose.onNodeWithTag("other-notes").performClick()
+        compose.onNodeWithText("Wpisy dla zmiany 1").assertExists()
         compose.onNodeWithText("Brak wpisów").assertExists()
-        compose.onNodeWithContentDescription("Wróć do produkcji").performClick()
-        compose.onNodeWithTag("production-tanks").performClick()
+        compose.onNodeWithContentDescription("Wróć do innych").performClick()
+        compose.onNodeWithTag("other-tanks").performClick()
         compose.onNodeWithTag("estimate-Silos 1", useUnmergedTree = true).assert(hasText("≈ 200 kg"))
         compose.onNodeWithTag("production-settings").performClick()
         compose.onNodeWithText("Gęstość materiału [kg/l]").performTextClearance()
@@ -158,19 +169,18 @@ class LaboratoryProductionUiTest {
         compose.onNodeWithTag("estimate-M-Tank 1", useUnmergedTree = true).assert(hasText("≈ 500 kg"))
         compose.onNodeWithTag("production-department-Powder").performClick()
         compose.onNodeWithTag("estimate-Silos 1", useUnmergedTree = true).assert(hasText("≈ 437,5 kg"))
-        compose.onNodeWithContentDescription("Wróć do produkcji").performClick()
-        compose.onNodeWithTag("production-notes").performClick()
+        compose.onNodeWithContentDescription("Wróć do innych").performClick()
+        compose.onNodeWithTag("other-notes").performClick()
         compose.onNodeWithText("Brak wpisów").assertExists()
-        compose.onNodeWithContentDescription("Wróć do produkcji").performClick()
-        compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
-        compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
-        compose.onNodeWithContentDescription("Zmień zmianę").performClick()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("other-menu").assertExists()
+        compose.onNodeWithContentDescription("Wróć do ekranu głównego").performClick()
+        compose.onNodeWithTag("home-Other").assertIsDisplayed()
+        screenshot("ekran-glowny-inne")
         compose.onNodeWithTag("home-Production").performClick()
-        listOf("tanks", "queue", "notes").forEach { compose.onNodeWithTag("production-$it").assertIsDisplayed() }
+        compose.onNodeWithTag("production-queue").assertIsDisplayed()
+        listOf("tanks", "notes").forEach { compose.onNodeWithTag("production-$it").assertDoesNotExist() }
         screenshot("menu-produkcja")
-        compose.onNodeWithTag("production-tanks").performClick()
-        compose.onNodeWithTag("estimate-Silos 1", useUnmergedTree = true).assert(hasText("≈ 437,5 kg"))
-        compose.onNodeWithContentDescription("Wróć do produkcji").performClick()
         compose.onNodeWithTag("production-queue").performClick()
         listOf("butter", "powder", "uht").forEach { compose.onNodeWithTag("production-queue_$it").assertIsDisplayed() }
         screenshot("menu-kolejka-produkcji")
@@ -184,7 +194,7 @@ class LaboratoryProductionUiTest {
             compose.onNodeWithTag("production-queue-menu").assertExists()
         }
         compose.onNodeWithContentDescription("Wróć do produkcji").performClick()
-        listOf("tanks", "queue", "notes").forEach { compose.onNodeWithTag("production-$it").assertIsDisplayed() }
+        compose.onNodeWithTag("production-queue").assertIsDisplayed()
         compose.onNodeWithContentDescription("Wróć do ekranu głównego").performClick()
         compose.onNodeWithTag("home-Production").assertExists()
     }

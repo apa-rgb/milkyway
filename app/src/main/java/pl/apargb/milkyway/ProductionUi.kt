@@ -17,11 +17,12 @@ import androidx.compose.ui.unit.dp
 import java.math.RoundingMode
 
 enum class ProductionDestination(val title: String) {
-    MENU("Produkcja"), TANKS("Zbiorniki — przewidywana produkcja"), NOTES("Wpisy"),
+    MENU("Produkcja"), OTHER_MENU("Inne"), TANKS("Zbiorniki — przewidywana produkcja"), NOTES("Wpisy"),
     QUEUE("Kolejka produkcji"), QUEUE_BUTTER("Masłownia"), QUEUE_POWDER("Proszkownia"), QUEUE_UHT("UHT");
 
     val parent: ProductionDestination? get() = when (this) {
-        MENU -> null
+        MENU, OTHER_MENU -> null
+        TANKS, NOTES -> OTHER_MENU
         QUEUE_BUTTER, QUEUE_POWDER, QUEUE_UHT -> QUEUE
         else -> MENU
     }
@@ -37,7 +38,7 @@ fun ProductionPage(scope: Int, notesModel: WorkNotesViewModel, notes: WorkNotesS
         when (destination) {
             ProductionDestination.TANKS -> ProductionTanksPage(inventory, assumptions, productionModel, onEdit, onRetry)
             ProductionDestination.NOTES -> WorkNotesPage(NoteKind.PRODUCTION, scope, notesModel, notes)
-            ProductionDestination.MENU, ProductionDestination.QUEUE -> ProductionMenu(destination, onNavigate)
+            ProductionDestination.MENU, ProductionDestination.OTHER_MENU, ProductionDestination.QUEUE -> ProductionMenu(destination, onNavigate)
             else -> ProductionQueuePage(when (destination) {
                 ProductionDestination.QUEUE_BUTTER -> ProductionLine.BUTTER
                 ProductionDestination.QUEUE_POWDER -> ProductionLine.POWDER
@@ -50,14 +51,18 @@ fun ProductionPage(scope: Int, notesModel: WorkNotesViewModel, notes: WorkNotesS
 @Composable
 private fun ProductionMenu(destination: ProductionDestination, onNavigate: (ProductionDestination) -> Unit) {
     val queue = destination == ProductionDestination.QUEUE
-    val options = if (queue) listOf(ProductionDestination.QUEUE_BUTTER, ProductionDestination.QUEUE_POWDER, ProductionDestination.QUEUE_UHT)
-        else listOf(ProductionDestination.TANKS, ProductionDestination.QUEUE, ProductionDestination.NOTES)
-    LazyColumn(Modifier.fillMaxSize().testTag(if (queue) "production-queue-menu" else "production-menu"),
+    val other = destination == ProductionDestination.OTHER_MENU
+    val options = when {
+        queue -> listOf(ProductionDestination.QUEUE_BUTTER, ProductionDestination.QUEUE_POWDER, ProductionDestination.QUEUE_UHT)
+        other -> listOf(ProductionDestination.TANKS, ProductionDestination.NOTES)
+        else -> listOf(ProductionDestination.QUEUE)
+    }
+    LazyColumn(Modifier.fillMaxSize().testTag(when { queue -> "production-queue-menu"; other -> "other-menu"; else -> "production-menu" }),
         contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(destination.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(if (queue) "Wybierz dział produkcji." else "Wybierz zbiorniki, kolejkę lub wpisy z przebiegu pracy.",
+                Text(when { queue -> "Wybierz dział produkcji."; other -> "Przewidywana produkcja ze zbiorników i wpisy z przebiegu pracy."; else -> "Planuj produkcję i zarządzaj kolejką zamówień." },
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -75,12 +80,12 @@ private fun ProductionMenu(destination: ProductionDestination, onNavigate: (Prod
                 ProductionDestination.QUEUE_POWDER -> Icons.Outlined.Grain
                 else -> Icons.Outlined.LocalFireDepartment
             }
-            MenuTile(option.title, when (option) {
+            MenuTile(if (other && option == ProductionDestination.TANKS) "Zbiorniki" else option.title, when (option) {
                 ProductionDestination.TANKS -> "Przybliżona ilość proszku i masła z parametrów zbiorników"
                 ProductionDestination.NOTES -> "Notatki o przebiegu produkcji na tej zmianie"
                 ProductionDestination.QUEUE -> "Masłownia, proszkownia i UHT"
                 else -> "Kolejka produkcji działu"
-            }, icon, tone, Modifier.fillMaxWidth().testTag("production-${option.name.lowercase()}"), cornerRadius = 14.dp) { onNavigate(option) }
+            }, icon, tone, Modifier.fillMaxWidth().testTag("${if (other) "other" else "production"}-${option.name.lowercase()}"), cornerRadius = 14.dp) { onNavigate(option) }
         }
     }
 }

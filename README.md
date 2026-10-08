@@ -1,17 +1,18 @@
 # Milkyway — aplikacja Android
 
-Wersja **0.7.1** dodaje usuwanie wpisów z magazynu po PIN-ie **5522**, podgląd dwóch słów notatki zamówienia i ikonę cofania do oczekujących. Aplikacja zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
+Wersja **0.7.2** dodaje na ekranie głównym przycisk **Inne**, do którego przeniesiono zbiorniki z przewidywaną produkcją oraz wpisy z menu Produkcja. Aplikacja zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
 
 Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
 
-- **Start:** uporządkowany ekran z datą, subtelną krówką i trzema przyciskami zmian; wybór jednej z trzech zmian otwiera osobny panel z nagłówkiem aktywnej zmiany, polem Notatki i sześcioma kafelkami: Zbiorniki, Produkcja, Laboratorium, Kontrola parametrów, Przypomnienia i Softlab. Wybór i bieżący ekran zachowują się przy obracaniu telefonu. Strzałka prowadzi do panelu lub wyboru zmiany.
+- **Start:** uporządkowany ekran z datą, subtelną krówką, trzema przyciskami zmian oraz przyciskami Produkcja, Magazyn/wyprodukowano i Inne. Wybór jednej z trzech zmian otwiera osobny panel z nagłówkiem aktywnej zmiany, polem Notatki i kafelkami: Zbiorniki, Laboratorium, Kontrola parametrów, Przypomnienia i Softlab. Wybór i bieżący ekran zachowują się przy obracaniu telefonu. Strzałka prowadzi do panelu lub wyboru zmiany.
 - **Notatki:** pole bezpośrednio w panelu zmiany otwiera bieżące notatki danej zmiany. Wpisy można dodawać, edytować i usuwać; to te same dane, które są dostępne przez Kontrolę parametrów → Bieżące notatki.
 - **Laboratorium:** przycisk w panelu zmiany otwiera ekran zabezpieczony ustalonym PIN-em. Po odblokowaniu można wpisywać pomiary wszystkich działów.
-- **Produkcja:** przycisk na ekranie głównym obok zmian otwiera menu z trzema przyciskami: Zbiorniki — przewidywana produkcja, Kolejka produkcji i Wpisy. Wpisy udostępniają te same notatki produkcji co Kontrola parametrów → Produkcja.
+- **Produkcja:** przycisk na ekranie głównym obok zmian otwiera Kolejkę produkcji z działami Masłownia, Proszkownia i UHT.
+- **Inne:** przycisk na ekranie głównym otwiera Zbiorniki z przewidywaną produkcją oraz Wpisy z przebiegu produkcji dla ostatnio wybranej zmiany. Powrót ze zbiorników lub wpisów prowadzi do Inne, a powrót z tego menu — do ekranu głównego.
 - **Zbiorniki:** opis, pojemność, edytowalna ilość i zawartość, Brix (w masłowni: procent tłuszczu), pH, SH, temperatura, automatyczna data ostatniego napełnienia oraz historia operacji.
 - **Softlab:** miejsce na instrukcję działania programu.
 - **Przypomnienia:** dodawanie, edycja, usuwanie i odznaczanie zadań jako wykonane; każdy wpis ma tytuł, treść notatki i datę zapisu. Powiadomienia i harmonogram nie są jeszcze zaimplementowane.
-- **Kontrola parametrów:** Klimatyzacja, Mycie, Produkcja i Bieżące notatki. W każdej sekcji można dodawać i poprawiać wpisy. Produkcja otwiera to samo menu zbiorników, kolejki i wpisów co główny przycisk.
+- **Kontrola parametrów:** Klimatyzacja, Mycie, Produkcja i Bieżące notatki. W Klimatyzacji, Myciu i Bieżących notatkach można dodawać i poprawiać wpisy. Produkcja otwiera to samo menu kolejki co główny przycisk; wpisy produkcji są dostępne w Inne.
 
 Dane 46 zbiorników pochodzą z arkusza `Zbiorniki.xlsx`. Działy są dostępne w kolejności: Odbieralnia, Aparatownia, Masłownia, Proszkownia i Oleje. Brakujące pojemności wyświetlają się jako „Do uzupełnienia”; w tych zbiornikach nie da się kontrolować maksymalnego stanu. Opis Softlab czeka na uzupełnienie. Katalog jest w `app/src/main/java/pl/apargb/milkyway/Content.kt`.
 

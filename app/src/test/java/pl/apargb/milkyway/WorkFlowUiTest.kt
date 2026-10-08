@@ -97,9 +97,9 @@ class WorkFlowUiTest {
         compose.onNodeWithText("Brak wpisów").assertExists()
         compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
         compose.onNodeWithTag("control-PRODUCTION").performClick()
-        compose.onNodeWithTag("production-notes").performClick()
-        compose.onNodeWithText("Brak wpisów").assertExists()
-        compose.onNodeWithContentDescription("Wróć do produkcji").performClick()
+        compose.onNodeWithTag("production-queue").assertIsDisplayed()
+        compose.onNodeWithTag("production-notes").assertDoesNotExist()
+        compose.onNodeWithTag("production-tanks").assertDoesNotExist()
         compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
 
