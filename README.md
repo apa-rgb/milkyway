@@ -1,0 +1,107 @@
+# Milkyway — aplikacja Android
+
+Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
+
+- **Start:** uporządkowany ekran z datą, subtelną krówką i trzema przyciskami zmian; wybór jednej z trzech zmian otwiera osobny panel z nagłówkiem aktywnej zmiany, polem Notatki i sześcioma kafelkami: Zbiorniki, Produkcja, Laboratorium, Kontrola parametrów, Przypomnienia i Softlab. Wybór i bieżący ekran zachowują się przy obracaniu telefonu. Strzałka prowadzi do panelu lub wyboru zmiany.
+- **Notatki:** pole bezpośrednio w panelu zmiany otwiera bieżące notatki danej zmiany. Wpisy można dodawać, edytować i usuwać; to te same dane, które są dostępne przez Kontrolę parametrów → Bieżące notatki.
+- **Laboratorium:** przycisk w panelu zmiany otwiera ekran zabezpieczony ustalonym PIN-em. Po odblokowaniu można wpisywać pomiary wszystkich działów.
+- **Produkcja:** przycisk na ekranie głównym obok zmian otwiera menu z trzema przyciskami: Zbiorniki — przewidywana produkcja, Kolejka produkcji i Wpisy. Wpisy udostępniają te same notatki produkcji co Kontrola parametrów → Produkcja.
+- **Zbiorniki:** opis, pojemność, edytowalna ilość i zawartość, Brix (w masłowni: procent tłuszczu), pH, SH, temperatura, automatyczna data ostatniego napełnienia oraz historia operacji.
+- **Softlab:** miejsce na instrukcję działania programu.
+- **Przypomnienia:** dodawanie, edycja, usuwanie i odznaczanie zadań jako wykonane; każdy wpis ma tytuł, treść notatki i datę zapisu. Powiadomienia i harmonogram nie są jeszcze zaimplementowane.
+- **Kontrola parametrów:** Klimatyzacja, Mycie, Produkcja i Bieżące notatki. W każdej sekcji można dodawać i poprawiać wpisy. Produkcja otwiera to samo menu zbiorników, kolejki i wpisów co główny przycisk.
+
+Dane 46 zbiorników pochodzą z arkusza `Zbiorniki.xlsx`. Działy są dostępne w kolejności: Odbieralnia, Aparatownia, Masłownia, Proszkownia i Oleje. Brakujące pojemności wyświetlają się jako „Do uzupełnienia”; w tych zbiornikach nie da się kontrolować maksymalnego stanu. Opis Softlab czeka na uzupełnienie. Katalog jest w `app/src/main/java/pl/apargb/milkyway/Content.kt`.
+
+## Przypomnienia, kontrola i bieżące notatki
+
+Wpisy są przypisane do wybranej zmiany i sekcji; przełączenie zmiany pokazuje jej własne przypomnienia i notatki. Tytuł może mieć do 120 znaków, treść do 10 000. Dotknięcie wpisu otwiera edycję, checkbox oznacza wykonanie przypomnienia, a ikona kosza umożliwia usunięcie po potwierdzeniu. Notatki i data ostatniej zmiany zapisują się lokalnie w osobnej bazie SQLite i pozostają po ponownym uruchomieniu aplikacji. Stany zbiorników są wspólne dla wszystkich zmian.
+
+## Laboratorium i pochodzenie pomiarów
+
+Laboratorium umożliwia zapis Brix (w masłowni: tłuszczu), pH, SH i temperatury. Zapis zachowuje ilość, zawartość oraz datę napełnienia, a czas badania zapisuje w historii. Wymagany jest przynajmniej jeden pomiar; pustego zbiornika nie można oznaczyć jako zmierzonego.
+
+Zielony znacznik **LAB** przy zbiorniku oznacza, że jego bieżące pomiary zapisano przez Laboratorium. Jest widoczny w zwykłej liście, szczegółach, Laboratorium i Produkcji. Korekta samej ilości lub opisu zachowuje oznaczenie. Ręczna zmiana pomiarów, dopływ materiału lub pełne opróżnienie je usuwa; poprzednie pomiary i ich pochodzenie pozostają w historii. Aktualizacja aplikacji nie oznacza starszych ręcznych pomiarów jako laboratoryjnych.
+
+PIN jest lokalną blokadą ekranu Laboratorium. Powrót do panelu, przejście aplikacji w tło i odtworzenie aktywności blokują dostęp ponownie; PIN i odblokowanie nie są zapisywane. Ekran Laboratorium blokuje zrzuty ekranu. Blokada tego ekranu nie szyfruje bazy ani nie zmienia dostępnej wcześniej ręcznej edycji zbiorników.
+
+## Przybliżona produkcja
+
+**Produkcja** na ekranie głównym obok mniejszych przycisków zmian (również z Kontroli parametrów) ma trzy przyciski: **Zbiorniki — przewidywana produkcja**, **Kolejka produkcji** oraz **Wpisy**. Kolejka produkcji otwiera trzy przyciski: **Masłownia**, **Proszkownia** i **UHT**, prowadzące do osobnych kalendarzy planowania produkcji. Strzałka i systemowy Wstecz cofają do poprzedniego poziomu menu, a obrót telefonu zachowuje otwarty ekran. Zbiorniki pokazują wszystkie silosy i krystalizatory proszkowni oraz wszystkie zbiorniki masłowni. Wynik aktualizuje się z bieżącej ilości i Brix lub procentu tłuszczu; dotknięcie wiersza otwiera ręczną edycję.
+
+Domyślne, orientacyjne założenia to **1 kg/l materiału**, **96% suchej masy proszku**, **82% tłuszczu w maśle** i **100% uzysku składnika**, czyli bez strat. Przycisk **Założenia** pozwala zmienić gęstość, docelowy skład i uzysk osobno dla działów. Ustawienia zapisują się na telefonie i są wspólne dla zmian.
+
+Wzór: produkcja [kg] = ilość [l] × gęstość [kg/l] × skład materiału [%] ÷ skład produktu [%] × uzysk [%] ÷ 100. Brix jest używany jako przybliżenie udziału suchej masy. Wynik jest szacunkiem potencjalnej produkcji, nie zapisem wyprodukowanego towaru; pH, SH i temperatura nie mają wymyślonych przeliczników wydajności. Brak stanu lub potrzebnego pomiaru wyświetla się jako brak wyniku; potwierdzony pusty zbiornik ma 0 kg. Nie sumujemy zbiorników, aby nie liczyć tego samego materiału na kolejnych etapach.
+
+## Kalendarz i kolejka produkcji
+
+Masłownia, Proszkownia i UHT mają oddzielne plany dla każdego dnia, wspólne dla trzech zmian. Wejście do działu domyślnie otwiera dzisiejszą datę w strefie czasowej telefonu i pokazuje zapisany plan tego dnia. Dotknięcie daty otwiera kalendarz; strzałki zmieniają dzień, a **Dzisiaj** wraca do bieżącego planu. Obrót telefonu zachowuje wybraną datę oraz edytowany formularz. Inne dni nie przejmują automatycznie dzisiejszych wpisów.
+
+W każdym dziale ekran dzieli się na dwie równe kolumny: **Produkcja** po lewej i **Wpłynęło zamówienie** po prawej. Przycisk **+ Zamówienie** zapisuje produkt, ilość (kg dla masłowni i proszkowni, litry dla UHT) i uwagi. Zamówienia oczekujące są wspólne dla wszystkich dat w obrębie działu; samo dodanie zamówienia nie nadaje mu terminu produkcji.
+
+Przytrzymaj podłużny kafelek i przeciągnij go z prawej na wybraną godzinę po lewej. Podświetlenie wskazuje miejsce upuszczenia; zapis przypisuje tę samą pozycję do wybranego dnia i godziny, bez duplikowania. Plan przewija się niezależnie w pionie przez przedziały co **2 godziny**: **00:00–02:00**, **02:00–04:00**, aż do **22:00–24:00**. Po ostatnim przedziale płynnie pojawia się następny dzień. Data nad kolejką oraz zaznaczony dzień po otwarciu kalendarza aktualizują się według dnia na górze widocznego planu. Dokładne godziny istniejących pozycji (np. **09:15**) pozostają zachowane; kafelek jest w przedziale **08:00–10:00**. Upuszczenie na przedział nadaje godzinę jego początku, a formularz nadal pozwala wpisać konkretną minutę. Przesunięcie w bok, strzałki i kalendarz również zmieniają dzień. Podczas przeciągania zbliżenie do górnej lub dolnej krawędzi planu przewija godziny; zatrzymanie nad strzałką daty przełącza dzień. Upuszczenie poza planem i kolumną oczekujących lub przerwanie gestu niczego nie zapisuje. Zaplanowany kafelek można przeciągnąć ponownie na inny termin.
+
+**Zaplanuj** przy zamówieniu pozwala wybrać dzień kalendarzem i wpisać dokładną godzinę **HH:mm**, np. **08:30**. Dotknięcie kafelka otwiera edycję produktu, ilości, uwag i terminu. W formularzu można też od razu wybrać **Produkcja**. Kolejność odpowiada godzinom; strzałki przy kafelkach przesuwają pozycje w obrębie tego samego terminu. Kilka pozycji może mieć tę samą godzinę. Starsze plany pozostają po lewej w sekcji **Bez godziny**; aktualizacja zachowuje ich ilości, kolejność i wykonanie. Produkt można cofnąć do **Wpłynęło zamówienie**, przeciągając kafelek z lewej do prawej kolumny albo dotykając **Do oczekujących**. Cofnięcie usuwa przypisanie do godziny i dnia produkcji. Przy częściowym wykonaniu oczekuje tylko pozostała ilość (np. **600 kg** z zamówionych **1000 kg**, gdy **400 kg** już wyprodukowano), a zapis wykonania pozostaje w katalogu **Wyprodukowano**. Notatki, opis i zamówiona ilość są zachowane; kafelek można później zaplanować ponownie na dowolny dzień i godzinę. Ta opcja działa również dla starszych pozycji bez godziny. Produkty wyprodukowane w całości pozostają w katalogu.
+
+Zamówienia, daty, godziny i kolejność zapisują się lokalnie w SQLite i pozostają po ponownym uruchomieniu. Zmiana terminu zachowuje opis, plan, wykonanie i historyczną datę zapisów produkcji. Usuwanie wymaga potwierdzenia. Planowanie nie aktualizuje ilości w zbiornikach.
+
+Przy pozycjach **bieżącego dnia** przycisk **Wyprodukowano** lub przytrzymanie towaru w produkcji pozwala wpisać wykonaną ilość. Przytrzymanie otwiera dymek z polem ilości i podglądem pozostałej produkcji oraz nadwyżki. Przesunięcie przytrzymanego kafelka zamyka dymek i rozpoczyna przeciąganie na nowy termin. **W całości** uzupełnia pozostałą ilość. Dymek i formularz zachowują wpisaną ilość po obrocie telefonu.
+
+**Wyprodukowano** jest osobnym przyciskiem na ekranie głównym, dostępnym bez wyboru zmiany. Katalog zawiera towary z masłowni, proszkowni i UHT z filtrami działów. Wpisanie **400 kg** dla zamówienia **1000 kg** pokazuje **400 kg** w katalogu i pozostawia **600 kg** w kolejce. Każdy kolejny zapis dodaje ilość z bieżącego etapu. Gdy łączna produkcja osiągnie plan, kafelek znika z kolejki. Produkcja ponad plan jest dozwolona: przy łącznej ilości **1200 kg** katalog pokazuje **Zamówiono: 1000 kg + nadmiar: 200 kg**, a w kolejce nie pozostaje żadna część. Zamówionej ilości nie zwiększamy automatycznie o nadwyżkę.
+
+**Rejestr dzienny:** domyślnie otwiera się dzień dzisiejszy. Strzałki, kalendarz i **Dzisiaj** zmieniają dzień rejestru. Wiersz produktu sumuje tylko zapisy wykonania z wybranego dnia. Jeśli zamówienie realizowano przez kilka dni, każde wykonanie trafia do swojego dnia, niezależnie od późniejszego przeplanowania kolejki. Podsumowanie osobno sumuje kg i litry, a masa wybrakowana ma własną rubrykę. Zwarte wiersze dopasowują się do miejsca na ekranie; większy rejestr ma kolejne strony w tym samym dniu, dostępne strzałkami na dole. Dotknięcie produktu otwiera szczegóły: ilość z danego dnia, ilość łączną, zamówienie, nadwyżkę, pozostałą ilość, opis i dzienne zapisy wykonania. Notatki pozostają dostępne przez ikonę. Data, filtr działu, strona i otwarte formularze zachowują się po obrocie telefonu.
+
+Aplikacja blokuje zero, ujemne ilości i zapisy dla innych dni. Każdy zapis ma identyfikator, aby ponowienie nie naliczało produkcji drugi raz. Wykonanie pozostaje po edycji, zmianie kolejności i ponownym uruchomieniu. Starsze wpisy bez ilości wymagają uzupełnienia zamówionego planu w edycji. Usuwanie jest dostępne dla pozycji kolejki bez wykonania; zapisów zwykłego wyprodukowanego towaru nie można usuwać, także przez kolejkę.
+
+## Wybrakowany towar
+
+W **Wyprodukowano** przycisk **+ Wybrakowany** otwiera formularz: dział, dzień rejestru, opis (do 4000 znaków) i masa **w kg**, również dla UHT. Domyślny dzień i dział odpowiadają bieżącemu widokowi. Masa musi być większa od zera, z dokładnością do 0,001 kg. Wpis ma własny czas zapisu i delikatne czerwone oznaczenie. Pełny opis można otworzyć dotknięciem wiersza. To osobny zapis braków — nie odejmuje automatycznie ilości z wyprodukowanego zamówienia ani zbiornika.
+
+Ikona kosza jest dostępna tylko przy wpisach wybrakowanego towaru i wymaga potwierdzenia. Usunięcie nie zmienia zwykłych wykonań, zamówień ani notatek. Zapisy i usunięcia pozostają po ponownym uruchomieniu; ponowienie dodawania nie tworzy duplikatu. Migracja bazy do wersji 5 zachowuje wcześniejsze plany, wykonania i notatki, dodając osobny rejestr braków.
+
+## Notatki produktu
+
+Przy każdym kafelku w **Wpłynęło zamówienie**, **Produkcja** oraz **Wyprodukowano** jest ikona notatek. Dymek wykonania ma też przycisk **Notatka**; powrót do dymka zachowuje wpisaną ilość. Wpisz **Nową notatkę** i zapisz. Kolejne notatki są dopisywane z czasem i etapem: **Zamówienie**, **Produkcja** lub **Wyprodukowano**. Ostatnia notatka jest widoczna na kafelku, a okno notatek pokazuje historię ze wszystkich etapów i wcześniejszy opis **Plan / uwagi**.
+
+Notatki są związane z produktem, więc pozostają po zaplanowaniu zamówienia, zmianie terminu, częściowym wykonaniu i pełnym przeniesieniu do katalogu. Przy częściowym wykonaniu można dopisać oddzielną notatkę dla pozostałej produkcji oraz wyprodukowanej partii. Notatki mają do 4000 znaków, zachowują się po obrocie i ponownym uruchomieniu, a ponowienie zapisu nie tworzy duplikatu. Aktualizacja bazy do wersji 4 dodaje historię notatek i zachowuje wcześniejsze plany, dokładne godziny, ilości oraz wykonania. Usunięcie pozycji kolejki bez wykonania po potwierdzeniu obejmuje również jej notatki. Produkty z wykonaniem i ich notatki pozostają w rejestrze.
+
+## Stany i przepływ materiału
+
+Działy mają stałe kolory i podpisy: odbieralnia — niebieski, aparatownia — turkusowy, masłownia — bursztynowy, proszkownia — fioletowy, oleje — różowy. Każdy dział ma osobną stronę przełączaną pięcioma obramowanymi zakładkami w dwóch rzędach nad listą. Pełne nazwy działów mają większą czcionkę, a wybrany dział — mocniejszą ramkę i pastelowe tło. Zbiorniki są pokazane w zwartych wierszach: nazwa, podgląd opisu lub wpisanej zawartości oraz stan i pojemność w litrach. Przy stanie 0 l pojawia się zielony napis „pusty”; nieznany stan jest nadal oznaczony jako nieustalony. Wysokość wierszy dopasowuje się do liczby zbiorników i miejsca na ekranie; na mniejszych ekranach lista jest przewijalna. W każdym wierszu widać pH, Brix i temperaturę w °C; w masłowni Brix zastępuje procent tłuszczu. Brak pomiaru jest oznaczony „—”. Pełny opis, pozostałe pomiary, data napełnienia i przyciski operacji są dostępne po dotknięciu wiersza. Mały znacznik trasy w proszkowni można też zmieniać bezpośrednio z listy.
+
+W ostatniej zakładce **Oleje** dotknij pola „Rodzaj” lub oznaczenia rodzaju w szczegółach, aby wpisać rodzaj oleju przy danym zbiorniku. Jest to niezależne oznaczenie, które można zapisać przed ustaleniem ilości i zachować po opróżnieniu. Puste pole usuwa oznaczenie. Zmiany są zapisywane lokalnie i trafiają do historii, bez zmiany ilości lub daty napełnienia.
+
+W masłowni pole **Tłuszcz [%]** zastępuje Brix w edycji, napełnianiu i szczegółach zbiornika. Przy przenoszeniu materiału pomiar jest dopasowany do zbiornika docelowego. Procent tłuszczu ma zakres 0–100 i jest zapisywany osobno w stanie oraz historii. Starsze pomiary Brix pozostają w historii jako Brix; nie są przeliczane ani przedstawiane jako tłuszcz.
+
+1. **Dotknij ilości** w wierszu działu albo pola **Stan** w szczegółach zbiornika, aby zmienić ręcznie ilość w m³, opis zawartości i parametry. Przycisk „Edytuj” został usunięty. Tak samo otworzysz edycję, dotykając „Nieustalony” lub stanu 0. Nieznany stan jest odróżniany od pustego; dla pustego wpisz 0. Puste pole ilości zachowuje obecny stan, więc można zapisać sam opis zawartości także przed ustaleniem ilości. Ręczna korekta trafia do historii. Po edycji wrócisz do strony, z której otwarto formularz.
+2. **Dolej materiał** (dla pustego zbiornika: **Napełnij**) dodaje podaną ilość do obecnego stanu, wraz z opisem źródła i pomiarami. Formularz pokazuje stan po dolaniu w litrach i podpowiada bieżący opis zawartości, który można poprawić.
+3. **Przenieś materiał** wybiera cel i ilość; zapis jednocześnie odejmuje ją ze źródła i dodaje do celu. Stan obu zbiorników musi być wcześniej ustalony. Aplikacja blokuje ujemne ilości, brak materiału, transfer do tego samego zbiornika i przekroczenie znanej pojemności.
+4. **Historia** pokazuje do 100 najnowszych wpisów dla danego zbiornika: skąd, dokąd, ile, czas, wybraną zmianę, parametry i uwagi. Starsze wpisy pozostają w bazie.
+5. **Wszystkie dolania** pokazuje każde napełnienie i dolewkę z zewnątrz oraz dopływ z innego zbiornika: ilość, źródło, czas, zmianę, zawartość, pomiary i uwagi. Nowe wpisy zawierają także stan przed i po dolaniu. Starsze wpisy są dostępne przez **Wczytaj starsze dolania**, bez limitu 100 wpisów. Historia dolewek pozostaje po opróżnieniu zbiornika i ponownym uruchomieniu. Ręczne korekty stanu i odpływy są w ogólnej Historii.
+
+Ręczna edycja jest dostępna dla wszystkich 46 zbiorników, także pustych, z nieustaloną ilością i bez podanej pojemności (w tym M-Tank 5 z opisem „Wyłączony”). Na liście cały obszar stanu i pojemności po prawej stronie otwiera edycję ilości oraz zawartości.
+
+Pod każdym wierszem w widoku działu znajduje się cienki, pastelowy pasek napełnienia, proporcjonalny do stanu i pojemności zbiornika. Aktualizuje się po korekcie ilości, napełnieniu i transferze. Przy nieznanym stanie albo brakującej pojemności pokazuje tylko delikatne tło; nie zakłada, że zbiornik jest pusty.
+
+Ilości przy edycji, napełnianiu i przenoszeniu wpisuje się w metrach sześciennych (m³), a stany, pojemności i historia są wyświetlane w litrach. **1 m³ = 1 000 l**; wpisanie **5,5 m³** oznacza **5 500 l**. Formularz pokazuje przeliczoną ilość przed zapisaniem. Przecinek i kropka są obsługiwane. Obliczenia są dokładne do 0,000001 m³ (0,001 l), bez zaokrąglania wpisanych ilości. Dotychczasowe dane w bazie nadal są przechowywane w litrach; ponowne otwarcie edytora przelicza je na m³.
+
+Data napełnienia oznacza czas ostatniego zapisanego dopływu (także pierwszego ustalenia dodatniego stanu lub jego zwiększenia); edycja samych pomiarów i zmniejszenie stanu jej nie zmieniają. Pełne opróżnienie usuwa bieżącą datę i pomiary; historia pozostaje. Daty są wyświetlane w strefie czasowej telefonu.
+
+Pomiary i opis po napełnieniu wpisuje użytkownik. Przy wyborze pustego zbiornika jako celu opis materiału jest wstępnie kopiowany ze źródła i można go poprawić. Przy dostawie z zewnątrz formularz podpowiada bieżący opis, a przy transferze do niepustego celu wpisz nowy opis; aplikacja nie zakłada rodzaju mieszaniny ani nie wylicza jej parametrów. Puste pola pomiarów oznaczają brak pomiaru dla nowej zawartości. Stan i historia są zapisywane razem w transakcji SQLite, lokalnie na urządzeniu. Powtórzenie tego samego zapisu nie nalicza transferu ponownie. Synchronizacja między telefonami nie jest zaimplementowana.
+
+Ikona aplikacji przedstawia wesołą krówkę na przezroczystym tle. Adaptacyjna ikona zachowuje margines dla okrągłych i innych masek launchera Androida. Launcher telefonu może dodać własne tło pod przezroczystą ikoną.
+
+## Znacznik trasy w proszkowni
+
+Dotknij małego znacznika **Wyparka — · Kryst. —** przy zbiorniku proszkowni. Wybierz wyparkę **C** lub **F** oraz krystalizator **1–6** z arkusza. Znak **—** usuwa wybór. Przycisk **Wyzeruj trasę** od razu usuwa oba oznaczenia przy wstrzymaniu produkcji i zapisuje powód w historii. Ilość, zawartość, pomiary, znacznik LAB i data napełnienia pozostają zapisane. Ustawienie zachowuje się po ponownym uruchomieniu. To oznaczenie trasy, a nie automatyczny transfer materiału.
+
+## Uruchamianie
+
+Otwórz projekt w Android Studio, użyj JDK 17 lub 21 i zainstaluj Android SDK 35.
+Skonfiguruj `ANDROID_HOME` lub lokalny, ignorowany przez Git plik `local.properties` ze ścieżką `sdk.dir`.
+
+```sh
+./gradlew assembleDebug testDebugUnitTest lintDebug
+```
+
+APK: `app/build/outputs/apk/debug/app-debug.apk`. Uruchom aplikację z Android Studio na emulatorze lub urządzeniu.
