@@ -82,6 +82,50 @@ class ProductionQueueUiTest {
         bitmap.recycle()
     }
 
+    @Test fun sevenCardsFitInBothColumnsWithMatchingDimensionsAndAllActionsInEveryLine() {
+        ProductionQueueRepository(model.getApplication()).useForTest { repo ->
+            ProductionLine.entries.forEach { line ->
+                repeat(7) { index ->
+                    repo.save("dense-order-${line.name}-$index", line, today, "Zamówienie ${index + 1}", "Pilna partia klienta", 100L + index,
+                        java.math.BigDecimal("1000"), pendingOrder = true)
+                    repo.save("dense-plan-${line.name}-$index", line, today, "Produkt ${index + 1}", "Opis bieżącej partii", 200L + index,
+                        java.math.BigDecimal("1000"), pendingOrder = false, scheduledTime = java.time.LocalTime.of(8, 0))
+                }
+                val entry = repo.load().single { it.id == "dense-plan-${line.name}-0" }
+                repo.setProductionCode("dense-code-${line.name}", entry, "007", 300L)
+                repo.recordProduction("dense-partial-${line.name}", entry.id, line, today, java.math.BigDecimal("200"), 301L)
+            }
+        }
+        compose.runOnIdle { model.reload() }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading } }
+        openQueue()
+        listOf(ProductionLine.BUTTER to "butter", ProductionLine.POWDER to "powder", ProductionLine.UHT to "uht").forEach { (line, route) ->
+            compose.onNodeWithTag("production-queue_$route").performClick()
+            compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-hour-$today-8"))
+            val ordersViewport = compose.onNodeWithTag("queue-orders").getUnclippedBoundsInRoot()
+            val planViewport = compose.onNodeWithTag("queue-list").getUnclippedBoundsInRoot()
+            repeat(7) { index ->
+                val order = compose.onNodeWithTag("queue-entry-dense-order-${line.name}-$index").getUnclippedBoundsInRoot()
+                val plan = compose.onNodeWithTag("queue-entry-dense-plan-${line.name}-$index").getUnclippedBoundsInRoot()
+                assertEquals((order.right - order.left).value, (plan.right - plan.left).value, .1f)
+                assertEquals(72f, (order.bottom - order.top).value, .1f); assertEquals((order.bottom - order.top).value, (plan.bottom - plan.top).value, .1f)
+                org.junit.Assert.assertTrue("Order ${index + 1} fully visible: $order in $ordersViewport",
+                    order.top >= ordersViewport.top && order.bottom <= ordersViewport.bottom)
+                org.junit.Assert.assertTrue("Product ${index + 1} fully visible: $plan in $planViewport",
+                    plan.top >= planViewport.top && plan.bottom <= planViewport.bottom)
+            }
+            val id = "dense-plan-${line.name}-0"
+            compose.onNodeWithTag("queue-code-$id").assert(hasText("007"))
+            compose.onNodeWithTag("queue-entry-$id").assert(hasText("Wykonano: 200 ${line.defaultUnit.label}", substring = true))
+            compose.onNodeWithTag("queue-remaining-$id", true).assertTextEquals("Pozostało: 800 ${line.defaultUnit.label}")
+            screenshot("cienkie-kafelki-siedem-$route")
+            compose.onNodeWithTag("queue-produced-$id").performClick()
+            compose.onNodeWithText("Wyprodukowano teraz [${line.defaultUnit.label}]").assertExists()
+            compose.onNodeWithText("Anuluj").performClick()
+            compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
+        }
+    }
+
     @Test fun incomingCardsShowTwoWordsKeepTheirSizeAndRetainTheFullNoteInHistory() {
         ProductionQueueRepository(model.getApplication()).useForTest { repo ->
             ProductionLine.entries.forEach { line ->
@@ -98,7 +142,7 @@ class ProductionQueueUiTest {
             compose.onNodeWithTag("production-queue_$menu").performClick()
             val before = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
             val scale = compose.activity.resources.displayMetrics.density
-            org.junit.Assert.assertTrue("Compact card height", before.height / scale <= 160f)
+            org.junit.Assert.assertTrue("Compact card height", before.height / scale <= 73f)
             compose.onNodeWithContentDescription("Usuń produkcję: ${line.title}").assertDoesNotExist()
             compose.onNodeWithTag("queue-return-$id").assertDoesNotExist()
             compose.onNodeWithTag("queue-schedule-$id").assertDoesNotExist()
@@ -721,7 +765,7 @@ class ProductionQueueUiTest {
         compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-entry-exact-time"))
         compose.onNodeWithTag("queue-entry-exact-time").assert(hasAnyAncestor(hasTestTag("queue-hour-${today.plusDays(1)}-8")))
         compose.onNodeWithTag("queue-entry-exact-time").assert(hasText("Pozostało: 1\u00a0000 l", substring = true))
-        compose.onNodeWithTag("queue-entry-exact-time").assert(hasText("Godzina: 09:15", substring = true))
+        compose.onNodeWithTag("queue-time-exact-time", useUnmergedTree = true).assertTextEquals("09:15")
         compose.activityRule.scenario.recreate()
         org.junit.Assert.assertEquals(java.time.LocalTime.of(9, 15), compose.runOnIdle { model.state.value.entries.single().scheduledTime })
         screenshot("kolejka-co-dwie-godziny")

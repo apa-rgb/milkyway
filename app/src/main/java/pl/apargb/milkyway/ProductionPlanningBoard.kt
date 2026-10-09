@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -287,7 +288,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                             val dayBackground = productionDayBackground(day, line.tone.tint, MaterialTheme.colorScheme.surface)
                             if (index % 13 == 0) {
                                 Column(Modifier.fillMaxWidth().testTag("queue-day-$day")
-                                    .background(dayBackground, RoundedCornerShape(12.dp)), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    .background(dayBackground, RoundedCornerShape(12.dp)), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(queueDateLabel(day), Modifier.padding(4.dp), fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelMedium, color = line.tone.accent)
                                     if (entries.isEmpty()) Text("Brak produkcji na ten dzień", Modifier.padding(4.dp),
@@ -307,7 +308,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                 val slot = ProductionPlanSlot(day, hour)
                                 DisposableEffect(slot) { onDispose { hourBounds.remove(slot) } }
                                 val scheduled = entries.filter { it.scheduledTime?.hour?.let { h -> h >= hour && h < hour + 2 } == true }
-                                Surface(Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("queue-hour-$day-$hour")
+                                Surface(Modifier.fillMaxWidth().heightIn(min = 40.dp).testTag("queue-hour-$day-$hour")
                                     .onGloballyPositioned { hourBounds[slot] = it.boundsInRoot() }, shape = RoundedCornerShape(12.dp),
                                     color = if (highlighted == slot) line.tone.accent.copy(alpha = .18f) else dayBackground,
                                     border = if (highlighted == slot) BorderStroke(2.dp, line.tone.accent) else null) {
@@ -337,14 +338,15 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                         style = MaterialTheme.typography.titleMedium)
                     Text(if (returningToOrders) "Upuść, aby cofnąć do oczekujących" else "Oczekujące: ${orders.size}", Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("queue-orders"), verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)) {
+                    LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("queue-orders"), verticalArrangement = Arrangement.spacedBy(4.dp),
+                        contentPadding = PaddingValues(bottom = 8.dp)) {
                         if (orders.isEmpty()) item {
                             Text("Brak oczekujących zamówień", Modifier.padding(6.dp), style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         items(orders, key = { it.id }) { entry ->
-                            PlanningCard(entry, entry.title, enabled, { edit(entry) }, {},                                 { bounds -> if (bounds == null) cardBounds.remove(entry.id) else cardBounds[entry.id] = bounds },
+                            PlanningCard(entry, entry.title, enabled, { edit(entry) }, {},
+                                { bounds -> if (bounds == null) cardBounds.remove(entry.id) else cardBounds[entry.id] = bounds },
                                 { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
                                 productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                         }
@@ -413,43 +415,52 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
     val background = productionCardBackground(entry.id)
     val note = latestNote?.text?.takeIf { it.isNotBlank() } ?: entry.description
     val preview = if (entry.pendingOrder) orderNotePreview(note) else note.trim().replace(Regex("[\\s\\u00a0]+"), " ")
-    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 32.dp) {
-        Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(156.dp * fontScale).testTag("queue-entry-${entry.id}")
-            .onGloballyPositioned { updateBounds(it.boundsInRoot()) }, color = background, shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .22f))) {
-            Column(Modifier.fillMaxSize().padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(Modifier.fillMaxWidth().height(32.dp * fontScale), verticalAlignment = Alignment.CenterVertically) {
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 24.dp) {
+        Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(72.dp * fontScale).testTag("queue-entry-${entry.id}")
+            .onGloballyPositioned { updateBounds(it.boundsInRoot()) }, color = background, shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .34f))) {
+            Column(Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Row(Modifier.fillMaxWidth().height(24.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(title, modifier = Modifier.weight(1f).testTag("queue-edit-${entry.id}")
                         .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
-                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 2,
+                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
-                    IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(32.dp).testTag("product-notes-${entry.id}")) {
-                        Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
+                    OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(34.dp).height(22.dp).testTag("queue-code-${entry.id}"),
+                        shape = RoundedCornerShape(5.dp), contentPadding = PaddingValues(0.dp)) {
+                        Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelSmall)
+                    }
+                    IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(24.dp).testTag("product-notes-${entry.id}")) {
+                        Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(15.dp), tint = entry.line.tone.accent)
                     }
                 }
-                Text(preview.ifBlank { "—" }, modifier = Modifier.height(28.dp * fontScale).testTag("queue-note-preview-${entry.id}"),
-                    style = MaterialTheme.typography.labelSmall, maxLines = if (entry.pendingOrder) 1 else 2,
-                    overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth().height(32.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
-                        Modifier.weight(1f).testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
-                        style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
-                    OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(46.dp).height(28.dp).testTag("queue-code-${entry.id}"),
-                        shape = RoundedCornerShape(6.dp), contentPadding = PaddingValues(0.dp)) {
-                        Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelMedium)
+                Row(Modifier.fillMaxWidth().height(14.dp * fontScale), horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(preview.ifBlank { "—" }, modifier = Modifier.weight(1f).testTag("queue-note-preview-${entry.id}"),
+                        style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    entry.scheduledTime?.let { time ->
+                        Text(time.toString(), modifier = Modifier.testTag("queue-time-${entry.id}"), style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1, color = entry.line.tone.accent)
                     }
                 }
-                Box(Modifier.fillMaxWidth().height(16.dp * fontScale)) {
-                    Text(if (entry.producedAmount.signum() > 0) "Wykonano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}"
-                        else entry.scheduledTime?.let { "Godzina: $it" }.orEmpty(),
-                        style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth().height(24.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
+                            Modifier.testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
+                            style = MaterialTheme.typography.labelSmall.copy(lineHeight = 12.sp), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
+                        if (entry.producedAmount.signum() > 0) Text("Wykonano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}",
+                            style = MaterialTheme.typography.labelSmall.copy(lineHeight = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (!entry.pendingOrder && entry.date == LocalDate.now()) {
+                        IconButton(onClick = onComplete, enabled = enabled && entry.remainingAmount?.signum() == 1,
+                            modifier = Modifier.size(24.dp).testTag("queue-produced-${entry.id}")) {
+                            Icon(Icons.Outlined.TaskAlt, "Wyprodukowano: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
+                        }
+                    }
                 }
-                if (!entry.pendingOrder && entry.date == LocalDate.now()) {
-                    OutlinedButton(onClick = onComplete, enabled = enabled && entry.remainingAmount?.signum() == 1,
-                        modifier = Modifier.fillMaxWidth().height(28.dp * fontScale).testTag("queue-produced-${entry.id}"),
-                        contentPadding = PaddingValues(0.dp)) { Text("Wyprodukowano", style = MaterialTheme.typography.labelSmall) }
-                } else Spacer(Modifier.height(28.dp * fontScale))
             }
         }
     }
