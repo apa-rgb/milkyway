@@ -43,7 +43,7 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
         require(id.isNotBlank()) { "Brak identyfikatora wpisu." }
         require(scope in 0..3) { "Wybierz zmianę 1, 2 lub 3." }
         require(title.trim().isNotEmpty()) { "Podaj tytuł wpisu." }
-        require(title.trim().length <= 120 && body.length <= 10000) { "Tytuł może mieć do 120 znaków, a treść do 10 000." }
+        require(title.trim().length <= 120 && noteBody(body).length <= 10000) { "Tytuł może mieć do 120 znaków, a treść do 10 000." }
         val db = helper.writableDatabase
         db.beginTransaction()
         try {

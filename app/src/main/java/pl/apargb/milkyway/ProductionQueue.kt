@@ -158,7 +158,7 @@ internal class ProductionQueueRepository(context: Context,
                            pendingOrder: Boolean? = null, scheduledTime: LocalTime? = null): List<ProductionQueueEntry> {
         require(id.isNotBlank()) { "Brak identyfikatora produkcji." }
         require(title.trim().isNotEmpty()) { "Podaj nazwę produkcji lub produktu." }
-        require(title.trim().length <= 120 && description.length <= 10000) { "Nazwa może mieć do 120 znaków, a opis do 10 000." }
+        require(title.trim().length <= 120 && productionDescription(description, line).length <= 10000) { "Nazwa może mieć do 120 znaków, a opis do 10 000." }
         require(date.year in 1900..2100) { "Wybierz datę w zakresie 1900–2100." }
         plannedAmount?.let(::validateProductionAmount)
         val db = helper.writableDatabase
@@ -332,7 +332,7 @@ internal class ProductionQueueRepository(context: Context,
     @Synchronized fun addProductNote(requestId: String, entry: ProductionQueueEntry, stage: ProductNoteStage,
                                      text: String, now: Long): List<ProductionQueueEntry> {
         require(requestId.isNotBlank()) { "Brak identyfikatora notatki." }
-        require(text.trim().isNotEmpty() && text.trim().length <= 4000) { "Wpisz notatkę (do 4000 znaków)." }
+        require(noteBody(text).trim().isNotEmpty() && noteBody(text).trim().length <= 4000) { "Wpisz notatkę (do 4000 znaków)." }
         val db = helper.writableDatabase
         db.beginTransaction()
         try {
@@ -352,6 +352,21 @@ internal class ProductionQueueRepository(context: Context,
                     put("note", text.trim()); put("created_at", now)
                 })
             }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        return load()
+    }
+
+    @Synchronized fun setProductNoteImportant(note: ProductNote, important: Boolean): List<ProductionQueueEntry> {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val current = db.query("production_product_notes", arrayOf("entry_id", "note"), "id = ?", arrayOf(note.id), null, null, null)
+                .use { if (it.moveToFirst()) it.getString(0) to it.getString(1) else null }
+                ?: throw IllegalArgumentException("Nie znaleziono notatki.")
+            require(current.first == note.entryId && !note.copy(text = current.second).isProductionCode()) { "To nie jest notatka produktu." }
+            db.update("production_product_notes", ContentValues().apply { put("note", withImportantText(noteBody(current.second), important)) },
+                "id = ?", arrayOf(note.id))
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         return load()

@@ -152,4 +152,80 @@ class SharedRowsTest {
             assertTrue(repo.load().first { it.id == "b" }.completed)
         }
     }
+
+    @Test fun butterTypesAndImportantProductNotesSurviveTwoOperatorsSchedulingAndPartialProduction() {
+        val day = LocalDate.now()
+        fun apply(previous: Map<String, Any?>, actor: Map<String, Any?>, block: (ProductionQueueRepository) -> Unit) =
+            ProductionQueueDatabase(context, null).useDatabase { helper ->
+                SharedRows.restore(helper, SharedDomain.PRODUCTION, previous)
+                block(ProductionQueueRepository(context, helper as ProductionQueueDatabase))
+                SharedRows.capture(helper, SharedDomain.PRODUCTION, previous, actor, 2000L)
+            }
+        var snapshot = apply(emptyMap(), actor1) { repo ->
+            ButterProductKind.entries.forEach { kind ->
+                repo.save(kind.name, ProductionLine.BUTTER, day, "Partia ${kind.title}",
+                    withButterKind("Pełny opis klienta", kind), 1L, BigDecimal("1000"), pendingOrder = true)
+                repo.addProductNote("note-${kind.name}", repo.load().single { it.id == kind.name }, ProductNoteStage.ORDER,
+                    withImportantText("Pilna dostawa przed południem", true), 2L)
+            }
+        }
+        snapshot = apply(snapshot, actor2) { repo ->
+            repo.load().forEach { repo.schedule(it, day, java.time.LocalTime.of(8, 30), 3L) }
+            repo.recordProduction("partial", "MIX", ProductionLine.BUTTER, day, BigDecimal("400"), 4L)
+            // A repeated flag operation must retain the note, original timestamp and stage.
+            val note = repo.snapshot().productNotes.single { it.entryId == "MIX" }
+            repo.setProductNoteImportant(note, false)
+            repo.setProductNoteImportant(note, false)
+        }
+        snapshot = apply(snapshot, actor1) { repo ->
+            val state = repo.snapshot()
+            state.entries.forEach { entry ->
+                assertEquals(ButterProductKind.valueOf(entry.id), entry.butterKind)
+                assertEquals("Pełny opis klienta", entry.planDescription)
+                assertEquals(java.time.LocalTime.of(8, 30), entry.scheduledTime)
+            }
+            val mix = state.entries.single { it.id == "MIX" }
+            assertEquals(BigDecimal("600"), mix.remainingAmount)
+            assertEquals(2, state.productNotes.size)
+            state.productNotes.forEach { note ->
+                assertEquals("Pilna dostawa przed południem", note.visibleText)
+                assertEquals(2L, note.createdAt); assertEquals(ProductNoteStage.ORDER, note.stage)
+                assertEquals(note.entryId == "BUTTER", note.important)
+            }
+            repo.setProductNoteImportant(state.productNotes.single { it.entryId == "MIX" }, true)
+            repo.recordProduction("finish", "MIX", ProductionLine.BUTTER, day, null, 5L)
+        }
+        apply(snapshot, actor2) { repo ->
+            assertEquals(ButterProductKind.MIX, repo.load().single { it.id == "MIX" }.butterKind)
+            assertTrue(repo.snapshot().productNotes.all { it.important })
+            assertEquals(2, repo.snapshot().completions.size)
+        }
+    }
+
+    @Test fun importantWorkNotesSurviveSharedCompletionAndEditsWithoutLosingCreationTimeOrScope() {
+        fun apply(previous: Map<String, Any?>, actor: Map<String, Any?>, block: (WorkNotesRepository) -> Unit) =
+            WorkNotesDatabase(context, null).useDatabase { helper ->
+                SharedRows.restore(helper, SharedDomain.NOTES, previous)
+                block(WorkNotesRepository(context, helper as WorkNotesDatabase))
+                SharedRows.capture(helper, SharedDomain.NOTES, previous, actor, 3000L)
+            }
+        var snapshot = apply(emptyMap(), actor1) { repo ->
+            repo.save("board", 0, NoteKind.REMINDER, "Awaria", withImportantText("Sprawdzić instalację", true), 1L)
+            repo.save("shift", 1, NoteKind.CURRENT_NOTES, "Pilne", withImportantText("", true), 2L)
+        }
+        snapshot = apply(snapshot, actor2) { repo ->
+            val board = repo.load().single { it.id == "board" }
+            assertTrue(board.important); assertEquals("Sprawdzić instalację", board.visibleBody)
+            repo.setCompleted(board, true, 3L)
+            repo.save(board.id, board.scope, board.kind, board.title, withImportantText(board.visibleBody, false), 4L)
+        }
+        apply(snapshot, actor1) { repo ->
+            val board = repo.load().single { it.id == "board" }
+            assertFalse(board.important); assertTrue(board.completed)
+            assertEquals(1L, board.createdAt); assertEquals(0, board.scope)
+            assertEquals("Sprawdzić instalację", board.body)
+            val shift = repo.load().single { it.id == "shift" }
+            assertTrue(shift.important); assertEquals("", shift.visibleBody); assertEquals(1, shift.scope)
+        }
+    }
 }

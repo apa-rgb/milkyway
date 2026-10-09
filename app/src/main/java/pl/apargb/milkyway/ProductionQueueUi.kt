@@ -26,7 +26,8 @@ fun ProductionQueuePage(line: ProductionLine, ui: ProductionQueueState, model: P
 internal fun ProductionQueueEditor(id: String, initial: ProductionQueueEntry?, line: ProductionLine, initialDate: LocalDate,
                                   ui: ProductionQueueState, model: ProductionQueueViewModel, onClose: () -> Unit, scheduleOrder: Boolean = false) {
     var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
-    var description by rememberSaveable { mutableStateOf(initial?.description ?: "") }
+    var description by rememberSaveable { mutableStateOf(initial?.planDescription ?: "") }
+    var butterKind by rememberSaveable { mutableStateOf(initial?.butterKind?.name) }
     var amount by rememberSaveable { mutableStateOf(initial?.plannedAmount?.inputText() ?: "") }
     var pending by rememberSaveable { mutableStateOf(if (scheduleOrder) false else initial?.pendingOrder ?: true) }
     var time by rememberSaveable { mutableStateOf(initial?.scheduledTime?.toString() ?: if (scheduleOrder) "08:00" else "") }
@@ -37,14 +38,23 @@ internal fun ProductionQueueEditor(id: String, initial: ProductionQueueEntry?, l
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     TankFormDialog(title = if (scheduleOrder) "Zaplanuj zamówienie" else if (initial == null) "Dodaj zamówienie" else "Edytuj pozycję", saving = ui.saving,
-        canSave = title.isNotBlank() && amount.isNotBlank(), onClose = onClose,
+        canSave = title.isNotBlank() && amount.isNotBlank() && (line != ProductionLine.BUTTER || initial != null || butterKind != null), onClose = onClose,
         onSave = {
-            try { model.save(requestId, id, line, date, title, description, parseDecimal(amount, "Planowana ilość", required = true)!!,
+            try { model.save(requestId, id, line, date, title, withButterKind(description, butterKind?.let(ButterProductKind::valueOf)), parseDecimal(amount, "Planowana ilość", required = true)!!,
                 pending, if (pending || time.isBlank()) null else parseProductionTime(time)) }
             catch (error: IllegalArgumentException) { model.showError(error.message ?: "Sprawdź ilość.") }
         }, content = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(line.title, color = line.tone.accent, fontWeight = FontWeight.SemiBold)
+                if (line == ProductionLine.BUTTER) {
+                    Text("Rodzaj produktu — wybierz Masło lub Mix", style = MaterialTheme.typography.labelLarge)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ButterProductKind.entries.forEach { kind ->
+                            FilterChip(butterKind == kind.name, onClick = { butterKind = kind.name; model.clearError() },
+                                enabled = !ui.saving, label = { Text(kind.title) }, modifier = Modifier.testTag("butter-kind-${kind.name}"))
+                        }
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(pending, onClick = { pending = true }, enabled = !ui.saving && initial?.completed != true,
                         label = { Text("Zamówienie") })

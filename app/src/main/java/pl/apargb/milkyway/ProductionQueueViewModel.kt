@@ -57,6 +57,8 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
         it.addProductNote(requestId, entry, stage, text, System.currentTimeMillis())
     }
 
+    fun setProductNoteImportant(note: ProductNote, important: Boolean) = mutate { it.setProductNoteImportant(note, important) }
+
     fun recordProduction(requestId: String, entry: ProductionQueueEntry, amount: BigDecimal?) = mutate(requestId) {
         it.recordProduction(requestId, entry.id, entry.line, entry.date, amount, System.currentTimeMillis())
     }

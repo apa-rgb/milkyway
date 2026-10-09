@@ -48,6 +48,8 @@ class ProductionQueueUiTest {
 
     private fun add(title: String, description: String = "") {
         compose.onNodeWithTag("queue-add").performClick()
+        if (compose.onAllNodesWithTag("butter-kind-BUTTER").fetchSemanticsNodes().isNotEmpty())
+            compose.onNodeWithTag("butter-kind-BUTTER").performClick()
         compose.onNodeWithTag("queue-editor-production").performClick()
         compose.onNodeWithTag("queue-editor-time").performTextClearance()
         compose.onNodeWithText("Produkcja / produkt").performTextInput(title)
@@ -86,9 +88,11 @@ class ProductionQueueUiTest {
         ProductionQueueRepository(model.getApplication()).useForTest { repo ->
             ProductionLine.entries.forEach { line ->
                 repeat(7) { index ->
-                    repo.save("dense-order-${line.name}-$index", line, today, "Zamówienie ${index + 1}", "Pilna partia klienta", 100L + index,
+                    repo.save("dense-order-${line.name}-$index", line, today, "Zamówienie ${index + 1}",
+                        withButterKind("Pilna partia klienta", if (line == ProductionLine.BUTTER) ButterProductKind.entries[index % 2] else null), 100L + index,
                         java.math.BigDecimal("1000"), pendingOrder = true)
-                    repo.save("dense-plan-${line.name}-$index", line, today, "Produkt ${index + 1}", "Opis bieżącej partii", 200L + index,
+                    repo.save("dense-plan-${line.name}-$index", line, today, "Produkt ${index + 1}",
+                        withButterKind("Opis bieżącej partii", if (line == ProductionLine.BUTTER) ButterProductKind.entries[index % 2] else null), 200L + index,
                         java.math.BigDecimal("1000"), pendingOrder = false, scheduledTime = java.time.LocalTime.of(8, 0))
                 }
                 val entry = repo.load().single { it.id == "dense-plan-${line.name}-0" }
@@ -125,6 +129,47 @@ class ProductionQueueUiTest {
             compose.onNodeWithText("Anuluj").performClick()
             compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
         }
+    }
+
+    @Test fun butterOrdersRequireATypeKeepItWhenScheduledAndImportantNotesCanBeUnmarked() {
+        openQueue(); compose.onNodeWithTag("production-queue_butter").performClick()
+        compose.onNodeWithTag("queue-add").performClick()
+        compose.onNodeWithText("Produkcja / produkt").performTextInput("Partia mix")
+        compose.onNodeWithText("Planowana ilość [kg]").performTextInput("1000")
+        compose.onNodeWithText("Zapisz").assertIsNotEnabled()
+        compose.onNodeWithTag("butter-kind-MIX").performScrollTo().performClick()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("butter-kind-MIX").assertIsSelected()
+        compose.onNodeWithText("Zapisz").assertIsEnabled().performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("Produkcja / produkt").fetchSemanticsNodes().isEmpty() }
+        val id = compose.runOnIdle { model.state.value.entries.single().id }
+        compose.onNodeWithTag("queue-kind-$id", true).assertTextEquals("Mix")
+        compose.onNodeWithTag("product-notes-$id").performClick()
+        compose.onNodeWithTag("product-note-input").performTextInput("Pilne wymagania klienta")
+        compose.onNodeWithTag("product-note-important").performClick()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("product-note-important").assertIsOn()
+        compose.onNodeWithText("Zapisz").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("product-notes-dialog").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("queue-note-preview-$id", true).assertTextEquals("Pilne wymagania").assertTextColor(ImportantNoteColor)
+        val note = compose.runOnIdle { model.state.value.productNotes.single() }
+        val before = compose.runOnIdle { productionCardBackground(model.state.value.entries.single()) }
+        compose.runOnIdle { model.schedule(model.state.value.entries.single(), today, java.time.LocalTime.of(8, 0)) }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && !model.state.value.entries.single().pendingOrder } }
+        compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-$id"))
+        compose.onNodeWithTag("queue-kind-$id", true).assertTextEquals("Mix")
+        compose.onNodeWithTag("queue-note-preview-$id", true).assertTextColor(ImportantNoteColor)
+        assertEquals(before, compose.runOnIdle { productionCardBackground(model.state.value.entries.single()) })
+        screenshot("maslownia-mix-wazna-notatka")
+        compose.onNodeWithTag("product-notes-$id").performClick()
+        compose.onNodeWithTag("product-note-important-${note.id}").performScrollTo().assertIsOn().performClick()
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && !model.state.value.productNotes.single().important } }
+        compose.onNodeWithTag("product-note-${note.id}", true).assertTextEquals("Pilne wymagania klienta")
+        compose.runOnIdle { assertEquals(note.createdAt, model.state.value.productNotes.single().createdAt) }
+        compose.onNodeWithText("Anuluj").performClick()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("queue-kind-$id", true).assertTextEquals("Mix")
+        compose.runOnIdle { org.junit.Assert.assertFalse(model.state.value.productNotes.single().important) }
     }
 
     @Test fun incomingCardsShowTwoWordsKeepTheirSizeAndRetainTheFullNoteInHistory() {
@@ -381,6 +426,7 @@ class ProductionQueueUiTest {
         listOf("butter" to "Masłownia", "powder" to "Proszkownia", "uht" to "UHT").forEach { (route, title) ->
             compose.onNodeWithTag("production-queue_$route").performClick()
             compose.onNodeWithTag("queue-add").performClick()
+            if (route == "butter") compose.onNodeWithTag("butter-kind-BUTTER").performClick()
             compose.onNodeWithText("Produkcja / produkt").performTextInput("$title zamówienie")
             compose.onNodeWithText("Planowana ilość [${if (route == "uht") "l" else "kg"}]").performTextInput("1500")
             compose.onNodeWithText("Plan / uwagi").performTextInput("Partia dla klienta")
@@ -670,6 +716,7 @@ class ProductionQueueUiTest {
     @Test fun notesCanBeAddedInOrdersProductionAndCompletedGoodsAndStayTogetherAfterReopening() {
         openQueue(); compose.onNodeWithTag("production-queue_butter").performClick()
         compose.onNodeWithTag("queue-add").performClick()
+        compose.onNodeWithTag("butter-kind-BUTTER").performClick()
         compose.onNodeWithText("Produkcja / produkt").performTextInput("Masło z notatkami")
         compose.onNodeWithText("Planowana ilość [kg]").performTextInput("1000")
         compose.onNodeWithText("Plan / uwagi").performTextInput("Plan odbiorcy")

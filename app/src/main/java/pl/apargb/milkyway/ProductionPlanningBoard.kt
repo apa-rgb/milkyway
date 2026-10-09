@@ -412,8 +412,8 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
     val updateBounds by rememberUpdatedState(onBounds)
     DisposableEffect(entry.id) { onDispose { updateBounds(null) } }
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
-    val background = productionCardBackground(entry.id)
-    val note = latestNote?.text?.takeIf { it.isNotBlank() } ?: entry.description
+    val background = productionCardBackground(entry)
+    val note = latestNote?.visibleText?.takeIf { it.isNotBlank() } ?: entry.planDescription
     val preview = if (entry.pendingOrder) orderNotePreview(note) else note.trim().replace(Regex("[\\s\\u00a0]+"), " ")
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 24.dp) {
         Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(72.dp * fontScale).testTag("queue-entry-${entry.id}")
@@ -426,6 +426,12 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                         .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
                         style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
+                    entry.butterKind?.let { kind ->
+                        Surface(shape = RoundedCornerShape(4.dp), color = entry.line.tone.accent.copy(alpha = .09f)) {
+                            Text(kind.title, Modifier.padding(horizontal = 4.dp, vertical = 2.dp).testTag("queue-kind-${entry.id}"),
+                                style = MaterialTheme.typography.labelSmall, color = entry.line.tone.accent, maxLines = 1)
+                        }
+                    }
                     if (entry.line == ProductionLine.POWDER) {
                         OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(34.dp).height(22.dp).testTag("queue-code-${entry.id}"),
                             shape = RoundedCornerShape(5.dp), contentPadding = PaddingValues(0.dp)) {
@@ -440,7 +446,7 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     verticalAlignment = Alignment.CenterVertically) {
                     Text(preview.ifBlank { "—" }, modifier = Modifier.weight(1f).testTag("queue-note-preview-${entry.id}"),
                         style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        color = if (latestNote?.important == true) ImportantNoteColor else MaterialTheme.colorScheme.onSurfaceVariant)
                     entry.scheduledTime?.let { time ->
                         Text(time.toString(), modifier = Modifier.testTag("queue-time-${entry.id}"), style = MaterialTheme.typography.labelSmall,
                             maxLines = 1, color = entry.line.tone.accent)
@@ -525,6 +531,11 @@ private fun Modifier.productionProductGestures(enabled: Boolean, canStartGesture
 }
 
 internal fun productionCardBackground(id: String): Color = Color.hsv(Math.floorMod(id.hashCode(), 360).toFloat(), .13f, .99f)
+internal fun productionCardBackground(entry: ProductionQueueEntry): Color = when (entry.butterKind) {
+    ButterProductKind.BUTTER -> Color.hsv(48f + Math.floorMod(entry.id.hashCode(), 12), .24f, 1f)
+    ButterProductKind.MIX -> Color.hsv(22f + Math.floorMod(entry.id.hashCode(), 12), .26f, 1f)
+    null -> productionCardBackground(entry.id)
+}
 
 internal data class ProductionPlanSlot(val date: LocalDate, val hour: Int)
 internal fun orderNotePreview(text: String): String = text.trim().split(Regex("[\\s\\u00a0]+"))

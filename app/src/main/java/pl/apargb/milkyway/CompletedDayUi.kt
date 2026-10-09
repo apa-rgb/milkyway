@@ -72,7 +72,7 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                                     Text(entry.title, fontWeight = FontWeight.Bold, color = entry.line.tone.accent,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(entry.line.title, style = MaterialTheme.typography.labelSmall)
+                                        Text(entry.line.title + entry.butterKind?.let { " · ${it.title}" }.orEmpty(), style = MaterialTheme.typography.labelSmall)
                                         Text("Wyprodukowano: ${decimalLabel(product.amount)} ${entry.unit.label}",
                                             Modifier.testTag("completed-amount-${entry.id}"), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                     }
@@ -85,9 +85,10 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                                             ProductionFulfilment.PARTIAL -> "Brakuje: ${entry.remainingAmount?.let(::decimalLabel)} ${entry.unit.label}"
                                             else -> "Plan do uzupełnienia"
                                         }
-                                        val note = ui.productNotes.firstOrNull { it.entryId == entry.id }?.text
-                                        Text(status + (note?.let { " · $it" } ?: ""), Modifier.testTag("completed-status-${entry.id}"),
-                                            maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
+                                        val note = ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() }
+                                        Text(status + (note?.let { " · ${it.visibleText}" } ?: ""), Modifier.testTag("completed-status-${entry.id}"),
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall,
+                                            color = if (note?.important == true) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
                                     }
                                 }
                                 IconButton(onClick = { onNotes(entry.id) }, enabled = enabled,

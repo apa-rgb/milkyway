@@ -1,6 +1,6 @@
 # Milkyway — aplikacja Android
 
-Wersja **0.7.6** pozostawia trzycyfrowy kod produkcji wyłącznie w **Proszkowni**. Masłownia i UHT pokazują szerszą nazwę produktu bez pola kodu. Aplikacja zachowuje cienkie kafelki o wysokości **72 dp** i delikatnej ramce. W obu kolumnach mają identyczny rozmiar, pozwalając pokazać około **6–7 pozycji** na ekranie przy standardowej wielkości tekstu. Nazwa, kod, fragment notatki, dokładna godzina i pozostała ilość są dostępne w zwartym układzie. Mała ikona z haczykiem lub przytrzymanie otwiera zapis wykonania. Przenoszenie i zmiana kolejności działają gestami; usuwanie wymaga PIN-u **5522**. Aplikacja zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
+Wersja **0.7.7** dodaje w Masłowni obowiązkowy wybór **Masło/Mix** przy nowym zamówieniu. Kafelki Masła mają łagodne żółte odcienie, a Mix — pomarańczowe, z oznaczeniem rodzaju przy nazwie. Notatki produktu, bieżące wpisy, przypomnienia i ogłoszenia mają przełącznik **Ważne**, który wyróżnia tekst na czerwono. Trzycyfrowy kod produkcji pozostaje wyłącznie w **Proszkowni**. Aplikacja zachowuje cienkie kafelki o wysokości **72 dp** i delikatnej ramce. W obu kolumnach mają identyczny rozmiar, pozwalając pokazać około **6–7 pozycji** na ekranie przy standardowej wielkości tekstu. Nazwa, kod, fragment notatki, dokładna godzina i pozostała ilość są dostępne w zwartym układzie. Mała ikona z haczykiem lub przytrzymanie otwiera zapis wykonania. Przenoszenie i zmiana kolejności działają gestami; usuwanie wymaga PIN-u **5522**. Aplikacja zawiera przygotowane logowanie na konta **01–10** i synchronizację danych przez Firebase. Wszystkie konta są operatorami. Utworzenie produkcyjnego projektu oraz kont wymaga dostępu Google Cloud; bez konfiguracji APK działa lokalnie. Instrukcja uruchomienia i stan weryfikacji: [cloud/README.md](cloud/README.md).
 
 Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
 
@@ -18,6 +18,8 @@ Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
 Dane 46 zbiorników pochodzą z arkusza `Zbiorniki.xlsx`. Działy są dostępne w kolejności: Odbieralnia, Aparatownia, Masłownia, Proszkownia i Oleje. Brakujące pojemności wyświetlają się jako „Do uzupełnienia”; w tych zbiornikach nie da się kontrolować maksymalnego stanu. Opis Softlab czeka na uzupełnienie. Katalog jest w `app/src/main/java/pl/apargb/milkyway/Content.kt`.
 
 ## Przypomnienia, kontrola i bieżące notatki
+
+W formularzu można zaznaczyć **Ważne**, aby tytuł i treść były czerwone również po ponownym otwarciu. Edycja pozwala wyłączyć wyróżnienie bez zmiany daty dodania. Ten sam przełącznik działa w ogłoszeniach.
 
 Wpisy są przypisane do wybranej zmiany i sekcji; przełączenie zmiany pokazuje jej własne przypomnienia i notatki. Tytuł może mieć do 120 znaków, treść do 10 000. Dotknięcie wpisu otwiera edycję, checkbox oznacza wykonanie przypomnienia, a ikona kosza umożliwia usunięcie po potwierdzeniu. W trybie lokalnym notatki i data ostatniej zmiany zapisują się w osobnej bazie SQLite. Po podłączeniu Firebase wpisy korzystają ze wspólnej bazy zakładu. Stany zbiorników są wspólne dla wszystkich zmian.
 
@@ -38,6 +40,8 @@ Domyślne, orientacyjne założenia to **1 kg/l materiału**, **96% suchej masy 
 Wzór: produkcja [kg] = ilość [l] × gęstość [kg/l] × skład materiału [%] ÷ skład produktu [%] × uzysk [%] ÷ 100. Brix jest używany jako przybliżenie udziału suchej masy. Wynik jest szacunkiem potencjalnej produkcji, nie zapisem wyprodukowanego towaru; pH, SH i temperatura nie mają wymyślonych przeliczników wydajności. Brak stanu lub potrzebnego pomiaru wyświetla się jako brak wyniku; potwierdzony pusty zbiornik ma 0 kg. Nie sumujemy zbiorników, aby nie liczyć tego samego materiału na kolejnych etapach.
 
 ## Kalendarz i kolejka produkcji
+
+Przy nowym zamówieniu w **Masłowni** trzeba wybrać **Masło** lub **Mix**. Rodzaj można zmienić podczas edycji; pozostaje przy produkcie po przeniesieniu do produkcji, powrocie do oczekujących i wykonaniu. Masło ma żółte, a Mix pomarańczowe odcienie kafelka. Starsze zamówienia bez oznaczenia zachowują wcześniejszy kolor do wybrania rodzaju w edycji. W magazynie rodzaj jest widoczny przy dziale oraz w szczegółach, a kolor nadal oznacza stopień realizacji zamówienia.
 
 Masłownia, Proszkownia i UHT mają oddzielne plany dla każdego dnia, wspólne dla trzech zmian. Wejście do działu domyślnie otwiera dzisiejszą datę w strefie czasowej telefonu i pokazuje zapisany plan tego dnia. Dotknięcie daty otwiera kalendarz; strzałki zmieniają dzień, a **Dzisiaj** wraca do bieżącego planu. Obrót telefonu zachowuje wybraną datę oraz edytowany formularz. Inne dni nie przejmują automatycznie dzisiejszych wpisów.
 
@@ -68,6 +72,8 @@ Ikona kosza przy wpisach wybrakowanego towaru wymaga podania PIN-u **5522** przy
 ## Notatki produktu
 
 Przy każdym kafelku w **Wpłynęło zamówienie**, **Produkcja** oraz **Magazyn/Wyprodukowano** jest ikona notatek. Dymek wykonania ma też przycisk **Notatka**; powrót do dymka zachowuje wpisaną ilość. Wpisz **Nową notatkę** i zapisz. Kolejne notatki są dopisywane z czasem i etapem: **Zamówienie**, **Produkcja** lub **Wyprodukowano**. Na kafelku wpływającego zamówienia widoczne są pierwsze **dwa słowa** ostatniej notatki w dotychczasowej pojedynczej linijce. Wielkość kafelka pozostaje bez zmian. Pozostałe etapy pokazują dotychczasowy podgląd notatki, a okno notatek pokazuje pełną treść i historię ze wszystkich etapów i wcześniejszy opis **Plan / uwagi**.
+
+W formularzu nowej notatki zaznacz **Ważne**, aby tekst był czerwony w historii i podglądzie na kafelku. Znacznik można też włączyć lub wyłączyć przy już zapisanej notatce bez zmiany jej treści, daty ani etapu. Wpisy historii zmiany kodu produkcji nie mają tego znacznika.
 
 Notatki są związane z produktem, więc pozostają po zaplanowaniu zamówienia, zmianie terminu, częściowym wykonaniu i pełnym przeniesieniu do katalogu. Przy częściowym wykonaniu można dopisać oddzielną notatkę dla pozostałej produkcji oraz wyprodukowanej partii. Notatki mają do 4000 znaków, zachowują się po obrocie i ponownym uruchomieniu, a ponowienie zapisu nie tworzy duplikatu. Aktualizacja bazy do wersji 4 dodaje historię notatek i zachowuje wcześniejsze plany, dokładne godziny, ilości oraz wykonania. Usunięcie pozycji kolejki bez wykonania po potwierdzeniu obejmuje również jej notatki. Produkty z wykonaniem i ich notatki pozostają w rejestrze.
 
@@ -121,3 +127,5 @@ W **Proszkowni** dotknij małego pola **Kod** na kafelku zamówienia lub produkc
 Przeciągnij produkt poziomo między kolumnami bez czekania na długie przytrzymanie. W produkcji przeciągnięcie w prawo cofa produkt do oczekujących; zamówienie przeciągnięte w lewo można upuścić na konkretną godzinę. Przytrzymaj i przeciągnij pionowo nad lub pod inny kafelek tej samej godziny, aby zmienić kolejność. Przeciągnięcie na zewnątrz (produkcja w lewo, zamówienie w prawo) otwiera potwierdzenie usunięcia z PIN-em. Zwykły ruch pionowy nadal przewija listę. Gest działa dalej, gdy źródłowy kafelek znika podczas automatycznego przewijania planu.
 
 Wysokość kafelków rośnie z systemowym rozmiarem tekstu, aby zachować czytelność. Na mniejszych ekranach lub przy powiększonej czcionce może być widocznych mniej pozycji. Puste przedziały godzinowe również zajmują mniej miejsca, a odstępy między zamówieniami wynoszą 4 dp.
+
+Rodzaj Masło/Mix i znacznik Ważne są zapisane jako czytelne adnotacje w istniejących polach opisu i treści. Dzięki temu mieszczą się w obecnych schematach wspólnej bazy (Produkcja: 2, Notatki: 1), pozostają w migawkach starszych klientów i nie wymagają wdrożenia nowych reguł Firebase. Aktualna aplikacja wyświetla adnotacje jako znaczniki; starsza może pokazywać je w treści. Limity dotyczą właściwego opisu/notatki, bez adnotacji.

@@ -49,11 +49,13 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithTag("announcements-add").performClick()
         compose.onNodeWithText("Tytuł").performTextInput("Informacja dla wszystkich")
         compose.onNodeWithText("Treść / notatka").performTextInput("Przegląd instalacji rano")
+        compose.onNodeWithTag("work-note-important").performScrollTo().performClick()
         compose.onNodeWithText("Zapisz").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("announcement-status-yesterday").fetchSemanticsNodes().isEmpty() &&
             compose.onAllNodesWithText("Tytuł").fetchSemanticsNodes().isEmpty() &&
             compose.runOnIdle { model.state.value.notes.any { it.title == "Informacja dla wszystkich" } } }
         val note = compose.runOnIdle { model.state.value.notes.single { it.title == "Informacja dla wszystkich" } }
+        compose.onNodeWithText("Przegląd instalacji rano", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
         compose.onNodeWithTag("announcement-created-${note.id}", true).assertTextEquals("Dodano: ${announcementTimestamp(note.createdAt)}")
         compose.onNodeWithTag("announcement-done-${note.id}").performClick()
         compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.notes.single { it.id == note.id }.completed } }
@@ -64,6 +66,7 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithText("Zapisz").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("Tytuł").fetchSemanticsNodes().isEmpty() }
         compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Zaktualizowane ogłoszenie", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
         compose.onNodeWithTag("announcement-done-${note.id}").assertIsOn()
         compose.runOnIdle { assertEquals(note.createdAt, model.state.value.notes.single { it.id == note.id }.createdAt) }
         compose.onNodeWithTag("announcements-days").performTouchInput { swipeUp(durationMillis = 450) }

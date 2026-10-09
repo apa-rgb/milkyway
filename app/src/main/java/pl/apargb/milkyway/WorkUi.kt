@@ -133,12 +133,14 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
                                     onCheckedChange = { model.setCompleted(note, it) }, enabled = !ui.saving,
                                     modifier = Modifier.testTag("done-${note.id}"))
                                 Text(note.title, Modifier.weight(1f), fontWeight = FontWeight.Bold,
+                                    color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (note.completed) TextDecoration.LineThrough else TextDecoration.None)
                                 IconButton(onClick = { deletingId = note.id }, enabled = !ui.saving) {
                                     Icon(Icons.Outlined.DeleteOutline, "Usuń wpis: ${note.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            if (note.body.isNotBlank()) Text(note.body, style = MaterialTheme.typography.bodyMedium,
+                            if (note.visibleBody.isNotBlank()) Text(note.visibleBody, style = MaterialTheme.typography.bodyMedium,
+                                color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface,
                                 maxLines = 4, overflow = TextOverflow.Ellipsis)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(noteDate(note.updatedAt), style = MaterialTheme.typography.labelSmall,
@@ -171,7 +173,8 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
                            model: WorkNotesViewModel, onClose: () -> Unit,
                            pageTitle: String = kind.title, addLabel: String = kind.addLabel) {
     var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
-    var body by rememberSaveable { mutableStateOf(initial?.body ?: "") }
+    var body by rememberSaveable { mutableStateOf(initial?.visibleBody ?: "") }
+    var important by rememberSaveable { mutableStateOf(initial?.important ?: false) }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     Dialog(onDismissRequest = { if (!ui.saving) onClose() },
@@ -181,7 +184,7 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
                 Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onClose, enabled = !ui.saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
-                    Button(onClick = { model.save(requestId, id, scope, kind, title, body) },
+                    Button(onClick = { model.save(requestId, id, scope, kind, title, withImportantText(body, important)) },
                         enabled = !ui.saving && title.isNotBlank(), modifier = Modifier.weight(1f)) {
                         Text(if (ui.saving) "Zapisywanie…" else "Zapisz")
                     }
@@ -191,11 +194,17 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(if (scope == 0) pageTitle else "$pageTitle · Zmiana $scope", color = kind.tone().accent)
                 OutlinedTextField(value = title, onValueChange = { title = it.take(120); model.clearError() },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
                     label = { Text("Tytuł") }, enabled = !ui.saving, singleLine = true,
                     modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
                 OutlinedTextField(value = body, onValueChange = { body = it.take(10000); model.clearError() },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
                     label = { Text("Treść / notatka") }, enabled = !ui.saving,
                     modifier = Modifier.fillMaxWidth(), minLines = 7, shape = RoundedCornerShape(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(important, { important = it }, enabled = !ui.saving, modifier = Modifier.testTag("work-note-important"))
+                    Text("Ważne", color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
+                }
                 Text("Data zapisu uzupełnia się automatycznie.", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }

@@ -144,12 +144,13 @@ private fun CompletedProductDetails(product: CompletedDayProduct, date: LocalDat
     AlertDialog(onDismissRequest = onClose, title = { Text(entry.title) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()).testTag("completed-details"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${entry.line.title} · ${queueDateLabel(date)}")
+            entry.butterKind?.let { Text("Rodzaj produktu: ${it.title}") }
             Text("Wyprodukowano tego dnia: ${decimalLabel(product.amount)} ${entry.unit.label}", fontWeight = FontWeight.Bold)
             Text("Łącznie wyprodukowano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}")
             Text(completedOrderLabel(entry))
             if (!entry.completed) Text((if (entry.pendingOrder) "Oczekuje na zaplanowanie: " else "W kolejce pozostało: ") +
                 "${entry.remainingAmount?.let(::decimalLabel) ?: "—"} ${entry.unit.label}")
-            if (entry.description.isNotBlank()) Text(entry.description)
+            if (entry.planDescription.isNotBlank()) Text(entry.planDescription)
             HorizontalDivider(); Text("Zapisy wykonania", fontWeight = FontWeight.Bold)
             product.receipts.forEach { receipt -> Text("${decimalLabel(receipt.amount)} ${entry.unit.label} · ${dateLabel(receipt.occurredAt)}") }
         }

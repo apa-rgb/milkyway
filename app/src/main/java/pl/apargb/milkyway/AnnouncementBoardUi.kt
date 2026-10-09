@@ -105,8 +105,10 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
                             modifier = Modifier.fillMaxWidth().testTag("announcement-${note.id}"), shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = if (note.completed) Department.Processing.tint else MaterialTheme.colorScheme.surface)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(note.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                if (note.body.isNotBlank()) Text(note.body, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                                Text(note.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                    color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
+                                if (note.visibleBody.isNotBlank()) Text(note.visibleBody, maxLines = 6, overflow = TextOverflow.Ellipsis,
+                                    color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
                                 Text("Dodano: ${announcementTimestamp(note.createdAt)}", Modifier.testTag("announcement-created-${note.id}"),
                                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Row(verticalAlignment = Alignment.CenterVertically) {

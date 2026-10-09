@@ -154,4 +154,32 @@ class WorkFlowUiTest {
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Poprawiona informacja").assertExists()
     }
+
+    @Test fun importantShiftNotesKeepTheirRedTextAfterReopeningAndCanBeUnmarked() {
+        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.onNodeWithTag("menu-Notes").performClick()
+        compose.onNodeWithText("Dodaj notatkę").performClick()
+        compose.onNodeWithText("Tytuł").performTextInput("Ważna informacja")
+        compose.onNodeWithText("Treść / notatka").performTextInput("Sprawdzić parametry przed produkcją")
+        compose.onNodeWithTag("work-note-important").performScrollTo().performClick()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("work-note-important").performScrollTo().assertIsOn()
+        compose.onNodeWithText("Zapisz").performClick()
+        waitForText("Ważna informacja")
+        compose.onNodeWithText("Ważna informacja", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
+        compose.onNodeWithText("Sprawdzić parametry przed produkcją", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
+        screenshot("wazna-notatka-zmiany")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Ważna informacja").performClick()
+        compose.onNodeWithText("Treść / notatka").assert(hasText("Sprawdzić parametry przed produkcją", substring = true))
+        compose.onNodeWithTag("work-note-important").performScrollTo().assertIsOn().performClick()
+        compose.onNodeWithText("Zapisz").performClick()
+        waitForText("Ważna informacja")
+        val model = ViewModelProvider(compose.activity)[WorkNotesViewModel::class.java]
+        compose.runOnIdle {
+            val note = model.state.value.notes.single()
+            org.junit.Assert.assertFalse(note.important)
+            org.junit.Assert.assertEquals("Sprawdzić parametry przed produkcją", note.body)
+        }
+    }
 }
