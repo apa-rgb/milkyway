@@ -67,6 +67,10 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
         it.move(entry.id, entry.line, entry.date, direction, System.currentTimeMillis())
     }
 
+    fun reorder(entry: ProductionQueueEntry, target: ProductionQueueEntry, after: Boolean) = mutate {
+        it.reorder(entry, target, after, System.currentTimeMillis())
+    }
+
     fun setProductionCode(requestId: String, entry: ProductionQueueEntry, code: String) = mutate(requestId) {
         it.setProductionCode(requestId, entry, code, System.currentTimeMillis())
     }

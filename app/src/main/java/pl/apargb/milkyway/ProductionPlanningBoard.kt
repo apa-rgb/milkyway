@@ -3,12 +3,9 @@ package pl.apargb.milkyway
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
@@ -38,6 +35,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,6 +91,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
     }
     val touchSlop = LocalViewConfiguration.current.touchSlop
     var dragged by remember { mutableStateOf<ProductionQueueEntry?>(null) }
+    var dragAnchor by remember { mutableStateOf(Offset.Zero) }
     var pointer by remember { mutableStateOf(Offset.Zero) }
     var rootOrigin by remember { mutableStateOf(Offset.Zero) }
     var planBounds by remember { mutableStateOf(Rect.Zero) }
@@ -99,11 +99,19 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
     var previousBounds by remember { mutableStateOf(Rect.Zero) }
     var nextBounds by remember { mutableStateOf(Rect.Zero) }
     val hourBounds = remember { mutableStateMapOf<ProductionPlanSlot, Rect>() }
+    val cardBounds = remember { mutableStateMapOf<String, Rect>() }
     val density = LocalDensity.current
     val edge = with(density) { 52.dp.toPx() }
     val highlighted = if (dragged != null && planBounds.contains(pointer)) hourBounds.entries
         .firstOrNull { it.value.contains(pointer) }?.key else null
     val returningToOrders = dragged?.pendingOrder == false && ordersBounds.contains(pointer)
+    val deleteThreshold = with(density) { 56.dp.toPx() }
+    fun outwardSwipe(entry: ProductionQueueEntry): Boolean {
+        val delta = pointer - dragAnchor
+        return abs(delta.y) < abs(delta.x) * .75f &&
+            (if (entry.pendingOrder) delta.x > deleteThreshold else delta.x < -deleteThreshold)
+    }
+    val deletingByGesture = dragged?.let { it.producedAmount.signum() == 0 && outwardSwipe(it) } == true
     fun changeDate(value: LocalDate) {
         if (value !in firstDate..lastDate) return
         navigationJob?.cancel()
@@ -158,9 +166,9 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
         if (heldId != null || dragged != null) return
         model.clearError(); scheduleOrder = schedule; editingId = entry.id
     }
-    val startDrag: (ProductionQueueEntry, Offset) -> Unit = { entry, point ->
-        pointer = point; heldDistance = Offset.Zero
-        if (entry.pendingOrder) { dragged = entry; heldId = null }
+    val startDrag: (ProductionQueueEntry, Offset, Boolean) -> Unit = { entry, point, immediate ->
+        pointer = point; dragAnchor = point; heldDistance = Offset.Zero
+        if (entry.pendingOrder || immediate) { dragged = entry; heldId = null }
         else { heldId = entry.id; heldAnchor = point }
     }
     val dragBy: (Offset) -> Unit = { amount ->
@@ -177,8 +185,20 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
         // Resolve the destination from the final pointer, even if rendering has not caught up with the last motion event.
         val destination = if (planBounds.contains(pointer)) hourBounds.entries.firstOrNull { it.value.contains(pointer) }?.key else null
         if (entry != null && enabled) {
-            if (!entry.pendingOrder && ordersBounds.contains(pointer)) model.returnToPending(entry)
-            else if (destination != null) model.schedule(entry, destination.date, LocalTime.of(destination.hour, 0))
+            val target = cardBounds.entries.firstOrNull { it.key != entry.id && it.value.contains(pointer) }
+                ?.let { hit -> ui.entries.find { it.id == hit.key }?.let { it to hit.value } }
+            if (outwardSwipe(entry)) {
+                if (entry.producedAmount.signum() == 0) { model.clearError(); deletingId = entry.id }
+                else model.showError("Pozycja ma zapisane wykonanie. Wyprodukowany towar usuń w magazynie.")
+            }
+            else if (!entry.pendingOrder && ordersBounds.contains(pointer)) model.returnToPending(entry)
+            else if (!entry.pendingOrder && target != null && !target.first.pendingOrder &&
+                target.first.date == entry.date && target.first.scheduledTime == entry.scheduledTime) {
+                model.reorder(entry, target.first, pointer.y >= target.second.center.y)
+            } else if (destination != null && (entry.pendingOrder || destination.date != entry.date ||
+                entry.scheduledTime == null || destination.hour != entry.scheduledTime.hour / 2 * 2)) {
+                model.schedule(entry, destination.date, LocalTime.of(destination.hour, 0))
+            }
         }
         dragged = null
     }
@@ -202,7 +222,9 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
             delay(35)
         }
     }
-    Box(Modifier.fillMaxSize().testTag("production-queue-page").onGloballyPositioned { rootOrigin = it.boundsInRoot().topLeft }) {
+    Box(Modifier.fillMaxSize().testTag("production-queue-page").onGloballyPositioned { rootOrigin = it.boundsInRoot().topLeft }
+        .productionProductGestures(enabled, heldId == null, ui.entries, cardBounds, rootOrigin,
+            startDrag, dragBy, finishDrag, { dragged = null })) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -214,7 +236,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                     Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Zamówienie")
                 }
             }
-            Text("Przytrzymaj towar, aby wpisać wykonanie. Przeciągnij między kolumnami lub na inny termin.",
+            Text("Przeciągnij między kolumnami. Na zewnątrz: usuń z PIN-em. Przytrzymaj: wykonanie lub zmiana kolejności.",
                 Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (editingId == null && completionId == null) ui.operationError?.let {
@@ -274,11 +296,10 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                     if (untimed.isNotEmpty()) Text("Bez godziny", Modifier.padding(4.dp), style = MaterialTheme.typography.labelMedium)
                                     untimed.forEach { entry -> key(entry.id) {
                                         PlanningCard(entry, "${entries.indexOf(entry) + 1}. ${entry.title}", enabled,
-                                            { edit(entry) }, { completionId = entry.id; model.clearError() }, { model.clearError(); deletingId = entry.id },
-                                            { model.move(entry, -1) }, { model.move(entry, 1) }, untimed.indexOf(entry) > 0,
-                                            untimed.indexOf(entry) < untimed.lastIndex, { edit(entry, true) }, startDrag, dragBy, finishDrag, { dragged = null },
+                                            { edit(entry) }, { completionId = entry.id; model.clearError() },
+                                            { bounds -> if (bounds == null) cardBounds.remove(entry.id) else cardBounds[entry.id] = bounds },
                                             { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
-                                            { model.returnToPending(entry) }, productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
+                                            productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                                     } }
                                 }
                             } else {
@@ -296,13 +317,11 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                             Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         scheduled.forEach { entry -> key(entry.id) {
-                                            val group = scheduled.filter { it.scheduledTime == entry.scheduledTime }
                                             PlanningCard(entry, "${entries.indexOf(entry) + 1}. ${entry.title}", enabled,
-                                                { edit(entry) }, { completionId = entry.id; model.clearError() }, { model.clearError(); deletingId = entry.id },
-                                                { model.move(entry, -1) }, { model.move(entry, 1) }, group.indexOf(entry) > 0,
-                                                group.indexOf(entry) < group.lastIndex, { edit(entry, true) }, startDrag, dragBy, finishDrag, { dragged = null },
+                                                { edit(entry) }, { completionId = entry.id; model.clearError() },
+                                                { bounds -> if (bounds == null) cardBounds.remove(entry.id) else cardBounds[entry.id] = bounds },
                                                 { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
-                                                { model.returnToPending(entry) }, productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
+                                                productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                                         } }
                                     }
                                 }
@@ -325,10 +344,9 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         items(orders, key = { it.id }) { entry ->
-                            PlanningCard(entry, entry.title, enabled, { edit(entry) }, {}, { model.clearError(); deletingId = entry.id }, {}, {}, false, false,
-                                { edit(entry, true) }, startDrag, dragBy, finishDrag, { dragged = null },
+                            PlanningCard(entry, entry.title, enabled, { edit(entry) }, {},                                 { bounds -> if (bounds == null) cardBounds.remove(entry.id) else cardBounds[entry.id] = bounds },
                                 { model.clearError(); notesId = entry.id }, ui.productNotes.firstOrNull { it.entryId == entry.id && !it.isProductionCode() },
-                                { model.returnToPending(entry) }, productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
+                                productionCode(ui.productNotes, entry.id), { model.clearError(); codeId = entry.id })
                         }
                     }
                 }
@@ -353,11 +371,12 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
         dragged?.let { entry ->
             Surface(Modifier.offset { IntOffset((pointer.x - rootOrigin.x - 70.dp.toPx()).roundToInt(),
                 (pointer.y - rootOrigin.y - 35.dp.toPx()).roundToInt()) }.width(150.dp),
-                shadowElevation = 8.dp, shape = RoundedCornerShape(14.dp), color = line.tone.accent) {
+                shadowElevation = 8.dp, shape = RoundedCornerShape(12.dp),
+                color = if (deletingByGesture) MaterialTheme.colorScheme.error else line.tone.accent) {
                 Column(Modifier.padding(10.dp)) {
                     Text(entry.title, color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold, maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
-                    Text(if (returningToOrders) "Do oczekujących" else highlighted?.let { "${queueDateLabel(it.date)} · %02d:00".format(it.hour) } ?: "Przenieś na godzinę",
+                    Text(if (deletingByGesture) "Usuń · PIN 5522" else if (returningToOrders) "Do oczekujących" else highlighted?.let { "${queueDateLabel(it.date)} · %02d:00".format(it.hour) } ?: "Przenieś na godzinę",
                         color = MaterialTheme.colorScheme.surface, style = MaterialTheme.typography.labelSmall)
                 }
             }
@@ -387,110 +406,108 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
 
 @Composable
 private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Boolean, onEdit: () -> Unit,
-                         onComplete: () -> Unit, onDelete: () -> Unit, onUp: () -> Unit, onDown: () -> Unit,
-                         canUp: Boolean, canDown: Boolean, onSchedule: () -> Unit,
-                         onDragStart: (ProductionQueueEntry, Offset) -> Unit, onDrag: (Offset) -> Unit,
-                         onDragEnd: () -> Unit, onDragCancel: () -> Unit, onNotes: () -> Unit, latestNote: ProductNote?,
-                         onReturnToPending: () -> Unit, code: String, onCode: () -> Unit) {
-    var bounds by remember { mutableStateOf(Rect.Zero) }
-    val start by rememberUpdatedState(onDragStart)
-    val drag by rememberUpdatedState(onDrag)
-    val end by rememberUpdatedState(onDragEnd)
-    val cancel by rememberUpdatedState(onDragCancel)
-    val currentEntry by rememberUpdatedState(entry)
+                         onComplete: () -> Unit, onBounds: (Rect?) -> Unit, onNotes: () -> Unit, latestNote: ProductNote?, code: String, onCode: () -> Unit) {
+    val updateBounds by rememberUpdatedState(onBounds)
+    DisposableEffect(entry.id) { onDispose { updateBounds(null) } }
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val background = productionCardBackground(entry.id)
     val note = latestNote?.text?.takeIf { it.isNotBlank() } ?: entry.description
     val preview = if (entry.pendingOrder) orderNotePreview(note) else note.trim().replace(Regex("[\\s\\u00a0]+"), " ")
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 32.dp) {
-    Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(256.dp * fontScale).testTag("queue-entry-${entry.id}")
-        .onGloballyPositioned { bounds = it.boundsInRoot() }
-        .pointerInput(entry.id, enabled) {
-            if (enabled) awaitEachGesture {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                val held = awaitLongPressOrCancellation(down.id)
-                if (held != null) {
-                    start(currentEntry, bounds.topLeft + held.position)
-                    var finished = false
-                    try {
-                        while (true) {
-                            // Consume in the initial pass so a release after a hold cannot also open the editor.
-                            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == held.id } ?: break
-                            if (change.changedToUpIgnoreConsumed()) {
-                                change.consume(); end(); finished = true; break
-                            }
-                            val amount = change.position - change.previousPosition
-                            change.consume()
-                            if (amount != Offset.Zero) drag(amount)
-                        }
-                    } finally { if (!finished) cancel() }
-                }
-            }
-        }, color = background, shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .22f))) {
-        Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Row(Modifier.fillMaxWidth().height(40.dp * fontScale), verticalAlignment = Alignment.CenterVertically) {
-                Text(title, modifier = Modifier.weight(1f).testTag("queue-edit-${entry.id}")
-                    .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
-                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
-                IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(32.dp).testTag("product-notes-${entry.id}")) {
-                    Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
-                }
-            }
-            Text(preview.ifBlank { "—" },
-                modifier = Modifier.height(32.dp * fontScale).testTag("queue-note-preview-${entry.id}"),
-                style = MaterialTheme.typography.labelSmall, maxLines = if (entry.pendingOrder) 1 else 2,
-                minLines = if (entry.pendingOrder) 1 else 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth().height(32.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("${entry.remainingAmount?.let(::decimalLabel) ?: "—"} ${entry.unit.label}" +
-                (entry.scheduledTime?.let { " · $it" } ?: ""), style = MaterialTheme.typography.labelSmall, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(58.dp).height(32.dp).testTag("queue-code-${entry.id}"),
-                shape = RoundedCornerShape(6.dp), contentPadding = PaddingValues(0.dp)) {
-                Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelMedium)
-            }
-            }
-            Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
-                Modifier.testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
-                style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
-            Box(Modifier.fillMaxWidth().height(16.dp * fontScale)) {
-                if (entry.producedAmount.signum() > 0) Text("Już wyprodukowano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}",
-                    style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (!entry.pendingOrder && entry.date == LocalDate.now()) {
-                OutlinedButton(onClick = onComplete,
-                    enabled = enabled && entry.remainingAmount?.signum() == 1,
-                    modifier = Modifier.fillMaxWidth().height(32.dp).testTag("queue-produced-${entry.id}"),
-                    contentPadding = PaddingValues(2.dp)) { Text("Wyprodukowano", style = MaterialTheme.typography.labelSmall) }
-            } else Spacer(Modifier.height(32.dp))
-            Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth().height(32.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                if (!entry.pendingOrder) {
-                    IconButton(onClick = onUp, enabled = enabled && canUp, modifier = Modifier.size(32.dp).testTag("queue-up-${entry.id}")) {
-                        Icon(Icons.Outlined.ArrowUpward, "Przesuń wyżej: ${entry.title}", Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = onDown, enabled = enabled && canDown, modifier = Modifier.size(32.dp).testTag("queue-down-${entry.id}")) {
-                        Icon(Icons.Outlined.ArrowDownward, "Przesuń niżej: ${entry.title}", Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = onReturnToPending, enabled = enabled, modifier = Modifier.size(32.dp).testTag("queue-return-${entry.id}")) {
-                        Icon(Icons.Outlined.MoveToInbox, "Przenieś do oczekujących", Modifier.size(16.dp))
-                    }
-                } else {
-                    Icon(Icons.Outlined.DragIndicator, "Przytrzymaj, aby przenieść: ${entry.title}", Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = onSchedule, enabled = enabled, modifier = Modifier.weight(1f)
-                        .testTag("queue-schedule-${entry.id}"), contentPadding = PaddingValues(0.dp)) {
-                        Text("Zaplanuj", style = MaterialTheme.typography.labelSmall)
+        Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(156.dp * fontScale).testTag("queue-entry-${entry.id}")
+            .onGloballyPositioned { updateBounds(it.boundsInRoot()) }, color = background, shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .22f))) {
+            Column(Modifier.fillMaxSize().padding(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(Modifier.fillMaxWidth().height(32.dp * fontScale), verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, modifier = Modifier.weight(1f).testTag("queue-edit-${entry.id}")
+                        .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
+                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
+                    IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(32.dp).testTag("product-notes-${entry.id}")) {
+                        Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
                     }
                 }
-                if (entry.producedAmount.signum() == 0) IconButton(onClick = onDelete, enabled = enabled, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Outlined.DeleteOutline, "Usuń produkcję: ${entry.title}", Modifier.size(16.dp))
+                Text(preview.ifBlank { "—" }, modifier = Modifier.height(28.dp * fontScale).testTag("queue-note-preview-${entry.id}"),
+                    style = MaterialTheme.typography.labelSmall, maxLines = if (entry.pendingOrder) 1 else 2,
+                    overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth().height(32.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
+                        Modifier.weight(1f).testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
+                        style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
+                    OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(46.dp).height(28.dp).testTag("queue-code-${entry.id}"),
+                        shape = RoundedCornerShape(6.dp), contentPadding = PaddingValues(0.dp)) {
+                        Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelMedium)
+                    }
                 }
+                Box(Modifier.fillMaxWidth().height(16.dp * fontScale)) {
+                    Text(if (entry.producedAmount.signum() > 0) "Wykonano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}"
+                        else entry.scheduledTime?.let { "Godzina: $it" }.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (!entry.pendingOrder && entry.date == LocalDate.now()) {
+                    OutlinedButton(onClick = onComplete, enabled = enabled && entry.remainingAmount?.signum() == 1,
+                        modifier = Modifier.fillMaxWidth().height(28.dp * fontScale).testTag("queue-produced-${entry.id}"),
+                        contentPadding = PaddingValues(0.dp)) { Text("Wyprodukowano", style = MaterialTheme.typography.labelSmall) }
+                } else Spacer(Modifier.height(28.dp * fontScale))
             }
         }
     }
+}
+
+// Observe card gestures on the board so dragging continues when auto-scroll recycles the source card.
+@Composable
+private fun Modifier.productionProductGestures(enabled: Boolean, canStartGesture: Boolean, entries: List<ProductionQueueEntry>,
+    cardBounds: Map<String, Rect>, rootOrigin: Offset, onDragStart: (ProductionQueueEntry, Offset, Boolean) -> Unit,
+    onDrag: (Offset) -> Unit, onDragEnd: () -> Unit, onDragCancel: () -> Unit): Modifier {
+    val config = LocalViewConfiguration.current
+    val haptics = LocalHapticFeedback.current
+    val currentEntries by rememberUpdatedState(entries)
+    val currentOrigin by rememberUpdatedState(rootOrigin)
+    val canStart by rememberUpdatedState(canStartGesture)
+    val start by rememberUpdatedState(onDragStart)
+    val drag by rememberUpdatedState(onDrag)
+    val end by rememberUpdatedState(onDragEnd)
+    val cancel by rememberUpdatedState(onDragCancel)
+    return pointerInput(enabled, config.touchSlop, config.longPressTimeoutMillis) {
+        if (enabled) awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val entry = currentEntries.firstOrNull { value -> cardBounds[value.id]?.contains(currentOrigin + down.position) == true }
+            if (entry == null || !canStart) return@awaitEachGesture
+            var activation: Offset? = null
+            var immediate = false
+            var abandoned = false
+            // Claim horizontal movement before either list handles it; vertical movement keeps normal scrolling.
+            val timed = withTimeoutOrNull(config.longPressTimeoutMillis) {
+                while (true) {
+                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed) { abandoned = true; break }
+                    val distance = change.position - down.position
+                    if (abs(distance.x) > config.touchSlop && abs(distance.x) > abs(distance.y)) {
+                        change.consume(); activation = distance; immediate = true; break
+                    }
+                    if (abs(distance.y) > config.touchSlop || change.isConsumed) { abandoned = true; break }
+                }
+                true
+            }
+            if (!abandoned && (activation != null || timed == null)) {
+                start(entry, currentOrigin + down.position, immediate)
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                activation?.let { drag(it) }
+                var finished = false
+                try {
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                        if (change.changedToUpIgnoreConsumed()) {
+                            change.consume(); end(); finished = true; break
+                        }
+                        val amount = change.position - change.previousPosition
+                        change.consume()
+                        if (amount != Offset.Zero) drag(amount)
+                    }
+                } finally { if (!finished) cancel() }
+            }
+        }
     }
 }
 

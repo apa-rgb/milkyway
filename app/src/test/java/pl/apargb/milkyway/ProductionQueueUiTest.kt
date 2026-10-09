@@ -97,6 +97,11 @@ class ProductionQueueUiTest {
             val id = "preview-${line.name}"
             compose.onNodeWithTag("production-queue_$menu").performClick()
             val before = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
+            val scale = compose.activity.resources.displayMetrics.density
+            org.junit.Assert.assertTrue("Compact card height", before.height / scale <= 160f)
+            compose.onNodeWithContentDescription("Usuń produkcję: ${line.title}").assertDoesNotExist()
+            compose.onNodeWithTag("queue-return-$id").assertDoesNotExist()
+            compose.onNodeWithTag("queue-schedule-$id").assertDoesNotExist()
             val fullText = "Pilna\npartia\u00a0do realizacji jutro rano"
             ProductionQueueRepository(model.getApplication()).useForTest { repo ->
                 repo.addProductNote("long-${line.name}", repo.load().single { it.id == id }, ProductNoteStage.ORDER, fullText, 3L)
@@ -210,17 +215,16 @@ class ProductionQueueUiTest {
         compose.onNodeWithTag("production-queue_butter").performClick()
         add("A", "Partia pierwsza"); add("B"); add("C")
         val c = compose.runOnIdle { model.state.value.entries.single { it.title == "C" }.id }
-        repeat(2) {
-            compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-up-$c"))
-            compose.onNodeWithTag("queue-up-$c").performScrollTo().performClick()
-            val expected = if (it == 0) listOf("A", "C", "B") else listOf("C", "A", "B")
-            compose.waitUntil(timeoutMillis = 10000) { dailyTitles() == expected }
-        }
-        compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-day-$today"))
-        compose.onNodeWithTag("queue-up-$c").assertIsNotEnabled()
+        val a = compose.runOnIdle { model.state.value.entries.single { it.title == "A" }.id }
+        val b = compose.runOnIdle { model.state.value.entries.single { it.title == "B" }.id }
+        reorderCard(c, b, after = false)
+        compose.waitUntil(timeoutMillis = 10000) { dailyTitles() == listOf("A", "C", "B") }
+        reorderCard(c, a, after = false)
+        compose.waitUntil(timeoutMillis = 10000) { dailyTitles() == listOf("C", "A", "B") }
+        compose.onNodeWithTag("queue-up-$c").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("1. C").assertExists()
-        compose.onNodeWithTag("queue-down-$c").performClick()
+        reorderCard(c, a, after = true)
         compose.waitUntil(timeoutMillis = 10000) { dailyTitles() == listOf("A", "C", "B") }
         compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-day-$today"))
         compose.onNodeWithText("1. A").performScrollTo().performClick()
@@ -253,10 +257,10 @@ class ProductionQueueUiTest {
         compose.onNodeWithText("Anuluj").performClick()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("queue-date").assert(hasText(queueDateLabel(otherDate)))
-        compose.onNodeWithContentDescription("Usuń produkcję: A poprawione").performClick()
+        swipeDelete(a)
         compose.onNodeWithText("Anuluj").performClick()
         compose.onNodeWithText("1. A poprawione").assertExists()
-        compose.onNodeWithContentDescription("Usuń produkcję: A poprawione").performClick()
+        swipeDelete(a)
         compose.onNodeWithTag("queue-delete-pin").performTextInput("5522")
         compose.onNodeWithText("Usuń").performClick()
         compose.waitUntil(timeoutMillis = 10000) { dailyTitles(otherDate).isEmpty() }
@@ -289,21 +293,21 @@ class ProductionQueueUiTest {
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
             val beforeDelete = compose.runOnIdle { model.state.value.entries.size }
-            compose.onNodeWithContentDescription("Usuń produkcję: Partia ${line.title}").performScrollTo().performClick()
+            swipeDelete(id)
             compose.onNodeWithTag("queue-delete-confirm").assertIsNotEnabled()
             compose.onNodeWithTag("queue-delete-pin").performTextInput("1111")
             compose.onNodeWithTag("queue-delete-confirm").performClick()
             compose.onNodeWithText("Nieprawidłowy PIN.").assertExists()
             compose.runOnIdle { assertEquals(beforeDelete, model.state.value.entries.size) }
             compose.onNodeWithText("Anuluj").performClick()
-            compose.onNodeWithTag("queue-return-$id").performScrollTo().performClick()
+            dragToPending(id, hold = false)
             compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.single { it.id == id }.pendingOrder } }
             compose.onNodeWithTag("queue-code-$id").assert(hasText("077")).performClick()
             compose.onNodeWithTag("production-code-input").performTextClearance()
             compose.onNodeWithTag("production-code-save").performClick()
             compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithTag("queue-code-$id").assert(hasText("Kod"))
-            compose.onNodeWithContentDescription("Usuń produkcję: Partia ${line.title}").performClick()
+            swipeDelete(id)
             compose.onNodeWithTag("queue-delete-pin").performTextInput("5522")
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("queue-delete-confirm").assertIsNotEnabled()
@@ -353,8 +357,9 @@ class ProductionQueueUiTest {
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("queue-date").assert(hasText(queueDateLabel(today.plusDays(1))))
             compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-entry-${order.id}"))
-            // A horizontal gesture changes only the date on the left. The planned entry remains on its original day.
-            compose.onNodeWithTag("queue-list").performTouchInput { swipeLeft() }
+            // A horizontal gesture on an empty time slot changes the date without touching the product.
+            compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-hour-${today.plusDays(1)}-16"))
+            compose.onNodeWithTag("queue-hour-${today.plusDays(1)}-16").performTouchInput { swipeLeft() }
             compose.onNodeWithTag("queue-date").assert(hasText(queueDateLabel(today.plusDays(2))))
             compose.onNodeWithContentDescription("Poprzedni dzień").performClick()
             compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-entry-${order.id}"))
@@ -378,7 +383,7 @@ class ProductionQueueUiTest {
         }
     }
 
-    @Test fun productsCanReturnToPendingByButtonAndDragInEveryLineKeepingPartialProductionAndNotes() {
+    @Test fun productsCanReturnToPendingByQuickDragAndHoldDragInEveryLineKeepingPartialProductionAndNotes() {
         openQueue()
         listOf("butter" to ProductionLine.BUTTER, "powder" to ProductionLine.POWDER, "uht" to ProductionLine.UHT).forEach { (route, line) ->
             compose.onNodeWithTag("production-queue_$route").performClick()
@@ -391,13 +396,13 @@ class ProductionQueueUiTest {
             val planned = compose.runOnIdle { model.state.value.entries.single { it.id == id } }
             compose.runOnIdle { model.recordProduction("partial-$route", planned, java.math.BigDecimal("400")) }
             compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.single { it.id == id }.producedAmount == java.math.BigDecimal("400") } }
-            compose.onNodeWithTag("queue-return-$id").performScrollTo().performClick()
+            dragToPending(id, hold = false)
             compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.single { it.id == id }.pendingOrder } }
             compose.onNodeWithTag("queue-entry-$id").assert(hasAnyAncestor(hasTestTag("queue-orders")))
             compose.onNodeWithTag("queue-pending-remaining-$id", useUnmergedTree = true).assertTextEquals("Oczekuje: 600 ${line.defaultUnit.label}")
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("queue-entry-$id").assert(hasAnyAncestor(hasTestTag("queue-orders")))
-            compose.onNodeWithTag("queue-schedule-$id").performClick()
+            openScheduleEditor(id, today)
             compose.onNodeWithText("Zapisz").performClick()
             compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.saving && !model.state.value.entries.single { it.id == id }.pendingOrder } }
             compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-$id"))
@@ -430,20 +435,56 @@ class ProductionQueueUiTest {
     }
 
     private fun dragCardToHour(id: String, hour: Int) {
-        val source = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot.center
         val destination = compose.onNodeWithTag("queue-hour-${today.plusDays(1)}-$hour").fetchSemanticsNode().boundsInRoot.center
+        val hold = !compose.runOnIdle { model.state.value.entries.single { it.id == id }.pendingOrder }
+        dragCard(id, destination, hold)
+    }
+
+    private fun dragCard(id: String, destination: androidx.compose.ui.geometry.Offset, hold: Boolean) {
+        val source = compose.onNodeWithTag("queue-edit-$id").fetchSemanticsNode().boundsInRoot.center
         val origin = compose.onRoot().fetchSemanticsNode().boundsInRoot.topLeft
         compose.onRoot().performTouchInput {
             down(source - origin)
-            advanceEventTime(750)
-            // Advance a frame after long press before crossing the column divider.
-            moveTo(source - origin)
-            repeat(12) { step -> moveTo(source + (destination - source) * ((step + 1) / 12f) - origin, delayMillis = 30) }
+            if (hold) { advanceEventTime(750); moveTo(source - origin) }
+            else {
+                val direction = if (destination.x > source.x) 1 else -1
+                moveTo(source + androidx.compose.ui.geometry.Offset(35f * direction, 0f) - origin, delayMillis = 16)
+            }
+            repeat(12) { step -> moveTo(source + (destination - source) * ((step + 1) / 12f) - origin, delayMillis = 16) }
             up()
         }
     }
 
-    @Test fun planButtonAcceptsMinutePrecisionAndRejectsInvalidTimeWithoutMovingOrder() {
+    private fun swipeDelete(id: String) {
+        compose.onNodeWithTag("queue-edit-$id").performScrollTo()
+        val source = compose.onNodeWithTag("queue-edit-$id").fetchSemanticsNode().boundsInRoot.center
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        val pending = compose.runOnIdle { model.state.value.entries.single { it.id == id }.pendingOrder }
+        dragCard(id, androidx.compose.ui.geometry.Offset(if (pending) root.right - 4 else root.left + 4, source.y), hold = false)
+        compose.onNodeWithTag("queue-delete-pin").assertExists()
+    }
+
+    private fun dragToPending(id: String, hold: Boolean) {
+        compose.onNodeWithTag("queue-edit-$id").performScrollTo()
+        val source = compose.onNodeWithTag("queue-edit-$id").fetchSemanticsNode().boundsInRoot.center
+        val orders = compose.onNodeWithTag("queue-pending-column").fetchSemanticsNode().boundsInRoot
+        dragCard(id, androidx.compose.ui.geometry.Offset(orders.center.x, source.y), hold)
+    }
+
+    private fun reorderCard(id: String, target: String, after: Boolean) {
+        compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-day-$today"))
+        val bounds = compose.onNodeWithTag("queue-entry-$target").fetchSemanticsNode().boundsInRoot
+        dragCard(id, androidx.compose.ui.geometry.Offset(bounds.center.x, bounds.center.y + if (after) 20 else -20), hold = true)
+    }
+
+    private fun openScheduleEditor(id: String, date: LocalDate) {
+        compose.onNodeWithTag("queue-edit-$id").performScrollTo().performClick()
+        compose.onNodeWithTag("queue-editor-production").performClick()
+        compose.onNodeWithTag("queue-editor-date").performClick()
+        chooseCalendarDay(date)
+    }
+
+    @Test fun editingAcceptsMinutePrecisionAndRejectsInvalidTimeWithoutMovingOrder() {
         openQueue(); compose.onNodeWithTag("production-queue_uht").performClick()
         compose.onNodeWithTag("queue-add").performClick()
         compose.onNodeWithText("Produkcja / produkt").performTextInput("UHT odbiorca")
@@ -452,7 +493,7 @@ class ProductionQueueUiTest {
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithText("Produkcja / produkt").fetchSemanticsNodes().isEmpty() }
         val id = compose.runOnIdle { model.state.value.entries.single().id }
         compose.onNodeWithContentDescription("Następny dzień").performClick()
-        compose.onNodeWithTag("queue-schedule-$id").performClick()
+        openScheduleEditor(id, today.plusDays(1))
         compose.onNodeWithTag("queue-editor-date").assert(hasText("Dzień produkcji: ${queueDateLabel(today.plusDays(1))}"))
         compose.onNodeWithTag("queue-editor-time").performTextClearance()
         compose.onNodeWithTag("queue-editor-time").performTextInput("24:00")
@@ -579,7 +620,7 @@ class ProductionQueueUiTest {
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithText("Produkcja / produkt").fetchSemanticsNodes().isEmpty() }
         val id = compose.runOnIdle { model.state.value.entries.single().id }
         appendNote(id, "Wymagania odbiorcy")
-        compose.onNodeWithTag("queue-schedule-$id").performClick()
+        openScheduleEditor(id, today)
         compose.onNode(hasText("Zapisz") and !hasTestTag("bubble-save")).performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithText("Produkcja / produkt").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-$id"))
@@ -619,6 +660,42 @@ class ProductionQueueUiTest {
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithTag("product-notes-dialog").fetchSemanticsNodes().isEmpty() }
     }
 
+    @Test fun shortHorizontalDragAndVerticalScrollingKeepTheProductAndMinutePrecision() {
+        compose.runOnIdle { model.save("short", "short", ProductionLine.UHT, today, "Krótki gest", "", java.math.BigDecimal("1000"),
+            pendingOrder = false, scheduledTime = java.time.LocalTime.of(9, 15)) }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.size == 1 } }
+        openQueue(); compose.onNodeWithTag("production-queue_uht").performClick()
+        compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-short"))
+        val before = compose.runOnIdle { model.state.value.entries.single() }
+        val source = compose.onNodeWithTag("queue-edit-short").fetchSemanticsNode().boundsInRoot.center
+        dragCard("short", source + androidx.compose.ui.geometry.Offset(-40f, 0f), hold = false)
+        compose.runOnIdle { assertEquals(before, model.state.value.entries.single()) }
+        compose.onNodeWithTag("queue-delete-pin").assertDoesNotExist()
+        compose.onNodeWithText("Produkcja / produkt").assertDoesNotExist()
+        compose.onNodeWithTag("queue-entry-short").performTouchInput { swipeUp(durationMillis = 300) }
+        compose.runOnIdle { assertEquals(before, model.state.value.entries.single()) }
+        compose.onNodeWithTag("queue-delete-pin").assertDoesNotExist()
+        compose.onNodeWithTag("production-completion-bubble").assertDoesNotExist()
+    }
+
+    @Test fun draggingPlannedProductContinuesAfterAutoScrollRecyclesSourceCard() {
+        compose.runOnIdle { model.save("offscreen", "offscreen", ProductionLine.UHT, today, "Przewijana produkcja", "", java.math.BigDecimal("1000"),
+            pendingOrder = false, scheduledTime = java.time.LocalTime.of(8, 0)) }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.size == 1 } }
+        openQueue(); compose.onNodeWithTag("production-queue_uht").performClick()
+        compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-offscreen"))
+        val origin = compose.onRoot().fetchSemanticsNode().boundsInRoot.topLeft
+        val source = compose.onNodeWithTag("queue-edit-offscreen").fetchSemanticsNode().boundsInRoot.center - origin
+        val plan = compose.onNodeWithTag("queue-list").fetchSemanticsNode().boundsInRoot
+        val bottom = androidx.compose.ui.geometry.Offset(plan.center.x, plan.bottom - 12f) - origin
+        compose.onRoot().performTouchInput { down(source); advanceEventTime(750); moveTo(source); moveTo(bottom, delayMillis = 100) }
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("queue-entry-offscreen").fetchSemanticsNodes().isEmpty() }
+        val destination = compose.onNodeWithTag("queue-pending-column").fetchSemanticsNode().boundsInRoot.center - origin
+        compose.onRoot().performTouchInput { moveTo(destination, delayMillis = 100); up() }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.single().pendingOrder } }
+        compose.onNodeWithTag("queue-entry-offscreen").assert(hasAnyAncestor(hasTestTag("queue-orders")))
+    }
+
     @Test fun twoHourTimelineScrollsIntoFollowingDaysUpdatesCalendarAndKeepsExactHours() {
         openQueue(); compose.onNodeWithTag("production-queue_uht").performClick()
         compose.runOnIdle {
@@ -643,7 +720,8 @@ class ProductionQueueUiTest {
         compose.onNodeWithText("Anuluj").performClick()
         compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-entry-exact-time"))
         compose.onNodeWithTag("queue-entry-exact-time").assert(hasAnyAncestor(hasTestTag("queue-hour-${today.plusDays(1)}-8")))
-        compose.onNodeWithTag("queue-entry-exact-time").assert(hasText("1\u00a0000 l · 09:15", substring = true))
+        compose.onNodeWithTag("queue-entry-exact-time").assert(hasText("Pozostało: 1\u00a0000 l", substring = true))
+        compose.onNodeWithTag("queue-entry-exact-time").assert(hasText("Godzina: 09:15", substring = true))
         compose.activityRule.scenario.recreate()
         org.junit.Assert.assertEquals(java.time.LocalTime.of(9, 15), compose.runOnIdle { model.state.value.entries.single().scheduledTime })
         screenshot("kolejka-co-dwie-godziny")

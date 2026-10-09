@@ -37,6 +37,27 @@ class ProductionQueueRepositoryTest {
     private fun ids(date: LocalDate = today, line: ProductionLine = ProductionLine.BUTTER) =
         repository.load().filter { it.line == line && it.date == date }.map { it.id }
 
+    @Test fun dragReorderingPreservesPositionsHistoryAndSeparateTimeGroups() {
+        listOf("a", "b", "c").forEach { repository.save(it, ProductionLine.BUTTER, today, it, "", 100L, BigDecimal("1000"), false) }
+        repository.save("other", ProductionLine.BUTTER, today, "Other hour", "", 101L, BigDecimal("1000"), false, java.time.LocalTime.of(8, 0))
+        val c = repository.load().single { it.id == "c" }
+        val a = repository.load().single { it.id == "a" }
+        repository.addProductNote("note", c, ProductNoteStage.PRODUCTION, "Keep this note", 110L)
+        repository.recordProduction("partial", c.id, c.line, c.date, BigDecimal("100"), 111L)
+        repository.reorder(c, a, false, 200L)
+        assertEquals(listOf("c", "a", "b", "other"), ids())
+        repository.reorder(c, a, true, 201L)
+        assertEquals(listOf("a", "c", "b", "other"), ids())
+        assertEquals(BigDecimal("100"), repository.load().single { it.id == "c" }.producedAmount)
+        assertEquals("Keep this note", repository.snapshot().productNotes.single().text)
+        val before = repository.snapshot()
+        assertThrows(IllegalArgumentException::class.java) { repository.reorder(c, repository.load().single { it.id == "other" }, false, 202L) }
+        assertEquals(before, repository.snapshot())
+        repository.close()
+        repository = ProductionQueueRepository(context, today = { today })
+        assertEquals(listOf("a", "c", "b", "other"), ids())
+    }
+
     @Test fun optionalProductionCodesPreserveZerosSurviveReopeningAndDeletionRejectsWrongPin() {
         repository.save("coded", ProductionLine.BUTTER, today, "Partia", "Opis", 100L, BigDecimal("1000"))
         val entry = repository.load().single()

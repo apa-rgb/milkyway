@@ -268,6 +268,34 @@ internal class ProductionQueueRepository(context: Context,
         return load()
     }
 
+    /** Place an active product next to a drop target within the same time group. */
+    @Synchronized fun reorder(entry: ProductionQueueEntry, target: ProductionQueueEntry, after: Boolean, now: Long): List<ProductionQueueEntry> {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val current = find(db, entry.id) ?: throw IllegalArgumentException("Nie znaleziono produkcji.")
+            val destination = find(db, target.id) ?: throw IllegalArgumentException("Nie znaleziono miejsca w kolejce.")
+            require(current.line == entry.line && current.date == entry.date && current.scheduledTime == entry.scheduledTime &&
+                !current.pendingOrder && !current.completed && destination.line == current.line && destination.date == current.date &&
+                destination.scheduledTime == current.scheduledTime && !destination.pendingOrder && !destination.completed) {
+                "Kolejka została zmieniona. Odśwież plan."
+            }
+            val peers = db.query("production_queue", null,
+                "line = ? AND plan_date = ? AND pending_order = 0 AND ${if (current.scheduledTime == null) "planned_time IS NULL" else "planned_time = ?"}",
+                buildList { add(current.line.name); add(current.date.toString()); current.scheduledTime?.let { add(it.toString()) } }.toTypedArray(),
+                null, null, "position").use { cursor -> buildList { while (cursor.moveToNext()) cursor.entry().takeUnless { it.completed }?.let(::add) } }
+            if (current.id != destination.id) {
+                val ordered = peers.filter { it.id != current.id }.toMutableList()
+                ordered.add(ordered.indexOfFirst { it.id == destination.id } + if (after) 1 else 0, current)
+                val temporary = nextPosition(db, current.line, current.date)
+                ordered.forEachIndexed { index, value -> updatePosition(db, value.id, temporary + index, now) }
+                ordered.forEachIndexed { index, value -> updatePosition(db, value.id, peers[index].position, now) }
+            }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        return load()
+    }
+
     /** A unique receipt ID prevents retries from adding the same partial production twice. */
     @Synchronized fun recordProduction(requestId: String, id: String, line: ProductionLine, date: LocalDate,
                                       amount: BigDecimal?, now: Long): List<ProductionQueueEntry> {
