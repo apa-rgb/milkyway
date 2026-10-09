@@ -396,7 +396,7 @@ internal fun ProductionPlanningBoard(line: ProductionLine, ui: ProductionQueueSt
         ProductNotesDialog(entry, if (entry.pendingOrder) ProductNoteStage.ORDER else ProductNoteStage.PRODUCTION,
             ui, model, onClose = { notesId = null })
     } }
-    ui.entries.find { it.id == codeId }?.let { entry -> key(entry.id) {
+    ui.entries.find { it.id == codeId && it.line == ProductionLine.POWDER }?.let { entry -> key(entry.id) {
         ProductionCodeDialog(entry, ui, model, onClose = { codeId = null })
     } }
     ui.entries.find { it.id == deletingId }?.let { entry -> key(entry.id) {
@@ -426,9 +426,11 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                         .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
                         style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
-                    OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(34.dp).height(22.dp).testTag("queue-code-${entry.id}"),
-                        shape = RoundedCornerShape(5.dp), contentPadding = PaddingValues(0.dp)) {
-                        Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelSmall)
+                    if (entry.line == ProductionLine.POWDER) {
+                        OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(34.dp).height(22.dp).testTag("queue-code-${entry.id}"),
+                            shape = RoundedCornerShape(5.dp), contentPadding = PaddingValues(0.dp)) {
+                            Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                     IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(24.dp).testTag("product-notes-${entry.id}")) {
                         Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(15.dp), tint = entry.line.tone.accent)

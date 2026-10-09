@@ -115,7 +115,8 @@ class ProductionQueueUiTest {
                     plan.top >= planViewport.top && plan.bottom <= planViewport.bottom)
             }
             val id = "dense-plan-${line.name}-0"
-            compose.onNodeWithTag("queue-code-$id").assert(hasText("007"))
+            if (line == ProductionLine.POWDER) compose.onNodeWithTag("queue-code-$id").assert(hasText("007"))
+            else compose.onNodeWithTag("queue-code-$id").assertDoesNotExist()
             compose.onNodeWithTag("queue-entry-$id").assert(hasText("Wykonano: 200 ${line.defaultUnit.label}", substring = true))
             compose.onNodeWithTag("queue-remaining-$id", true).assertTextEquals("Pozostało: 800 ${line.defaultUnit.label}")
             screenshot("cienkie-kafelki-siedem-$route")
@@ -315,10 +316,14 @@ class ProductionQueueUiTest {
             try { org.junit.Assert.assertEquals(listOf("C", "B"), repository.load().map { it.title }) } finally { repository.close() }
         }
     }
-    @Test fun productionCodesAndDeletionPinsWorkInAllLines() {
+    @Test fun productionCodesAreOnlyInPowderWhileDeletionPinsWorkInAllLines() {
         ProductionQueueRepository(model.getApplication()).useForTest { repo ->
-            ProductionLine.entries.forEach { line -> repo.save("code-${line.name}", line, today, "Partia ${line.title}", "Materiały do przygotowania", 1L,
-                java.math.BigDecimal("1000"), pendingOrder = false) }
+            ProductionLine.entries.forEach { line ->
+                repo.save("code-${line.name}", line, today, "Partia ${line.title}", "Materiały do przygotowania", 1L,
+                    java.math.BigDecimal("1000"), pendingOrder = false)
+                if (line != ProductionLine.POWDER) repo.setProductionCode("legacy-code-${line.name}",
+                    repo.load().single { it.id == "code-${line.name}" }, "077", 2L)
+            }
         }
         compose.runOnIdle { model.reload() }
         compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading } }
@@ -326,16 +331,22 @@ class ProductionQueueUiTest {
         listOf("butter" to ProductionLine.BUTTER, "powder" to ProductionLine.POWDER, "uht" to ProductionLine.UHT).forEach { (route, line) ->
             val id = "code-${line.name}"
             compose.onNodeWithTag("production-queue_$route").performClick()
-            compose.onNodeWithTag("queue-code-$id").performScrollTo().performClick()
-            compose.onNodeWithTag("production-code-input").performTextInput("07")
-            compose.onNodeWithTag("production-code-save").assertIsNotEnabled()
-            compose.onNodeWithTag("production-code-input").performTextInput("7")
-            compose.onNodeWithTag("production-code-save").performClick()
-            compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
-            compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
+            if (line == ProductionLine.POWDER) {
+                compose.onNodeWithTag("queue-code-$id").performScrollTo().performClick()
+                compose.onNodeWithTag("production-code-input").performTextInput("07")
+                compose.onNodeWithTag("production-code-save").assertIsNotEnabled()
+                compose.onNodeWithTag("production-code-input").performTextInput("7")
+                compose.onNodeWithTag("production-code-save").performClick()
+                compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
+                compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
+                compose.activityRule.scenario.recreate()
+                compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
+            } else {
+                compose.onNodeWithTag("queue-code-$id").assertDoesNotExist()
+                compose.activityRule.scenario.recreate()
+                compose.onNodeWithTag("queue-code-$id").assertDoesNotExist()
+            }
             compose.onNodeWithTag("queue-note-preview-$id", true).assertTextEquals("Materiały do przygotowania")
-            compose.activityRule.scenario.recreate()
-            compose.onNodeWithTag("queue-code-$id").assert(hasText("077"))
             val beforeDelete = compose.runOnIdle { model.state.value.entries.size }
             swipeDelete(id)
             compose.onNodeWithTag("queue-delete-confirm").assertIsNotEnabled()
@@ -346,11 +357,13 @@ class ProductionQueueUiTest {
             compose.onNodeWithText("Anuluj").performClick()
             dragToPending(id, hold = false)
             compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.entries.single { it.id == id }.pendingOrder } }
-            compose.onNodeWithTag("queue-code-$id").assert(hasText("077")).performClick()
-            compose.onNodeWithTag("production-code-input").performTextClearance()
-            compose.onNodeWithTag("production-code-save").performClick()
-            compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
-            compose.onNodeWithTag("queue-code-$id").assert(hasText("Kod"))
+            if (line == ProductionLine.POWDER) {
+                compose.onNodeWithTag("queue-code-$id").assert(hasText("077")).performClick()
+                compose.onNodeWithTag("production-code-input").performTextClearance()
+                compose.onNodeWithTag("production-code-save").performClick()
+                compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
+                compose.onNodeWithTag("queue-code-$id").assert(hasText("Kod"))
+            } else compose.onNodeWithTag("queue-code-$id").assertDoesNotExist()
             swipeDelete(id)
             compose.onNodeWithTag("queue-delete-pin").performTextInput("5522")
             compose.activityRule.scenario.recreate()
