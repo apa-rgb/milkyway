@@ -84,7 +84,7 @@ class ProductionQueueUiTest {
         bitmap.recycle()
     }
 
-    @Test fun sevenCardsFitInBothColumnsWithMatchingDimensionsAndAllActionsInEveryLine() {
+    @Test fun sixCompactCardsFitInBothColumnsWithAllActionsAndCompleteAmountsInEveryLine() {
         ProductionQueueRepository(model.getApplication()).useForTest { repo ->
             ProductionLine.entries.forEach { line ->
                 repeat(7) { index ->
@@ -112,10 +112,11 @@ class ProductionQueueUiTest {
                 val order = compose.onNodeWithTag("queue-entry-dense-order-${line.name}-$index").getUnclippedBoundsInRoot()
                 val plan = compose.onNodeWithTag("queue-entry-dense-plan-${line.name}-$index").getUnclippedBoundsInRoot()
                 assertEquals((order.right - order.left).value, (plan.right - plan.left).value, .1f)
-                assertEquals(72f, (order.bottom - order.top).value, .1f); assertEquals((order.bottom - order.top).value, (plan.bottom - plan.top).value, .1f)
-                org.junit.Assert.assertTrue("Order ${index + 1} fully visible: $order in $ordersViewport",
+                org.junit.Assert.assertTrue("Compact order: $order", (order.bottom - order.top).value in 72f..84f)
+                org.junit.Assert.assertTrue("Compact product: $plan", (plan.bottom - plan.top).value in 72f..84f)
+                if (index < 6) org.junit.Assert.assertTrue("Order ${index + 1} fully visible: $order in $ordersViewport",
                     order.top >= ordersViewport.top && order.bottom <= ordersViewport.bottom)
-                org.junit.Assert.assertTrue("Product ${index + 1} fully visible: $plan in $planViewport",
+                if (index < 6) org.junit.Assert.assertTrue("Product ${index + 1} fully visible: $plan in $planViewport",
                     plan.top >= planViewport.top && plan.bottom <= planViewport.bottom)
             }
             val id = "dense-plan-${line.name}-0"
@@ -129,6 +130,43 @@ class ProductionQueueUiTest {
             compose.onNodeWithText("Anuluj").performClick()
             compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
         }
+    }
+
+    @Test fun longProductNamesAndAmountsWrapWithoutClippingAlongsideCodeTimeAndActions() {
+        val title = "Mleko w proszku odtłuszczone specjalna partia dla klienta"
+        ProductionQueueRepository(model.getApplication()).useForTest { repo ->
+            listOf("long-order" to true, "long-plan" to false).forEach { (id, pending) ->
+                repo.save(id, ProductionLine.POWDER, today, title, "Kontrola parametrów przed wysyłką", 100L,
+                    java.math.BigDecimal("123456789.125"), pendingOrder = pending,
+                    scheduledTime = if (pending) null else java.time.LocalTime.of(8, 15))
+            }
+            val entry = repo.load().single { it.id == "long-plan" }
+            repo.setProductionCode("long-code", entry, "283", 200L)
+            repo.recordProduction("long-partial", entry.id, entry.line, today, java.math.BigDecimal("123.125"), 201L)
+        }
+        compose.runOnIdle { model.reload() }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading } }
+        openQueue(); compose.onNodeWithTag("production-queue_powder").performClick()
+        compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-hour-$today-8"))
+        screenshot("produkcja-pelne-informacje")
+        listOf("long-order", "long-plan").forEach { id ->
+            val card = compose.onNodeWithTag("queue-entry-$id").getUnclippedBoundsInRoot()
+            listOf("queue-edit-$id", "queue-note-preview-$id",
+                "queue-${if (id == "long-order") "pending-remaining" else "remaining"}-$id").forEach { tag ->
+                val text = compose.onNodeWithTag(tag, useUnmergedTree = true)
+                val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                text.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                org.junit.Assert.assertFalse("Clipped text at $tag: ${layouts.single().size}, ${layouts.single().layoutInput.constraints}, width=${layouts.single().didOverflowWidth}, height=${layouts.single().didOverflowHeight}", layouts.single().hasVisualOverflow)
+                val bounds = text.getUnclippedBoundsInRoot()
+                org.junit.Assert.assertTrue("Text outside its tile: $tag", bounds.left >= card.left && bounds.right <= card.right &&
+                    bounds.top >= card.top && bounds.bottom <= card.bottom)
+            }
+            compose.onNodeWithTag("product-notes-$id").assertIsDisplayed()
+        }
+        compose.onNodeWithTag("queue-code-long-plan").assert(hasText("283"))
+        compose.onNodeWithTag("queue-time-long-plan", true).assertTextEquals("08:15")
+        compose.onNodeWithTag("queue-produced-long-plan").assertIsDisplayed()
+        screenshot("produkcja-pelne-informacje")
     }
 
     @Test fun butterOrdersRequireATypeKeepItWhenScheduledAndImportantNotesCanBeUnmarked() {
@@ -210,7 +248,7 @@ class ProductionQueueUiTest {
             compose.runOnIdle { model.schedule(order, today, java.time.LocalTime.MIDNIGHT) }
             compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && !model.state.value.entries.single { it.id == id }.pendingOrder } }
             compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-edit-$id"))
-            compose.onNodeWithTag("queue-note-preview-$id", useUnmergedTree = true).assertTextEquals("Pilna partia do realizacji jutro rano")
+            compose.onNodeWithTag("queue-note-preview-$id", useUnmergedTree = true).assertTextEquals("Pilna partia")
             val inProduction = compose.onNodeWithTag("queue-entry-$id").fetchSemanticsNode().boundsInRoot
             assertEquals(before.width, inProduction.width, .1f); assertEquals(before.height, inProduction.height, .1f)
             compose.activityRule.scenario.recreate()
@@ -392,7 +430,7 @@ class ProductionQueueUiTest {
                 compose.activityRule.scenario.recreate()
                 compose.onNodeWithTag("queue-code-$id").assertDoesNotExist()
             }
-            compose.onNodeWithTag("queue-note-preview-$id", true).assertTextEquals("Materiały do przygotowania")
+            compose.onNodeWithTag("queue-note-preview-$id", true).assertTextEquals("Materiały do")
             val beforeDelete = compose.runOnIdle { model.state.value.entries.size }
             swipeDelete(id)
             compose.onNodeWithTag("queue-delete-confirm").assertIsNotEnabled()

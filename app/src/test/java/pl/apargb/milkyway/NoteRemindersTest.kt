@@ -70,11 +70,12 @@ class NoteRemindersTest {
             action(WorkNotesRepository(context, db))
             SharedRows.capture(db, SharedDomain.NOTES, previous, mapOf("uid" to reader, "account" to reader), 600L)
         }
-        var snapshot = update(emptyMap(), "01") { it.save("n", 2, NoteKind.CURRENT_NOTES, "A", withNoteReminder("B", NoteReminder(500L)), 1L, "Anna") }
+        var snapshot = update(emptyMap(), "01") { it.save("n", 2, NoteKind.CURRENT_NOTES, "", withNoteReminder("B", NoteReminder(500L)), 1L, "Anna") }
         snapshot = update(snapshot, "01") { val n = it.load().single(); it.actReminder(n, n.reminder!!.token, ReminderAction.READ, "01", 501L) }
         snapshot = update(snapshot, "02") { val n = it.load().single(); it.actReminder(n, n.reminder!!.token, ReminderAction.READ, "02", 502L) }
         update(snapshot, "03") {
             val n = it.load().single()
+            assertEquals("", n.title); assertEquals("B", n.visibleBody)
             assertEquals(setOf("01", "02"), n.reminder!!.readBy); assertTrue(n.reminder!!.due("03", 600L)); assertEquals("Anna", n.author)
             it.actReminder(n, n.reminder!!.token, ReminderAction.DONE, "03", 601L)
             assertFalse(workReminderItems(it.load()).single().reminder.due("04", 700L))

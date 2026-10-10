@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,6 +69,7 @@ internal fun ReminderButton(reminder: NoteReminder?, enabled: Boolean, tag: Stri
     if (selecting) ReminderPicker(reminder, onClose = { selecting = false }, onSelect = { onSelect(it); selecting = false })
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderPicker(initial: NoteReminder?, onClose: () -> Unit, onSelect: (Long) -> Unit) {
     val default = initial?.let { Instant.ofEpochMilli(it.at).atZone(ZoneId.systemDefault()).toLocalDateTime() }
@@ -75,6 +77,7 @@ private fun ReminderPicker(initial: NoteReminder?, onClose: () -> Unit, onSelect
     var date by rememberSaveable { mutableStateOf(default.toLocalDate().toString()) }
     var time by rememberSaveable { mutableStateOf(default.format(DateTimeFormatter.ofPattern("HH:mm"))) }
     var calendar by rememberSaveable { mutableStateOf(false) }
+    var clock by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     TankFormDialog("Kiedy przypomnieć?", false, true, onClose, onSave = {
         runCatching { reminderMoment(LocalDate.parse(date), time) }.onSuccess(onSelect).onFailure { error = it.message }
@@ -83,8 +86,10 @@ private fun ReminderPicker(initial: NoteReminder?, onClose: () -> Unit, onSelect
             OutlinedButton(onClick = { calendar = true }, modifier = Modifier.fillMaxWidth().testTag("reminder-date")) {
                 Text("Dzień: ${queueDateLabel(LocalDate.parse(date))}")
             }
-            OutlinedTextField(time, { time = it.take(5); error = null }, label = { Text("Godzina (HH:mm)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().testTag("reminder-time"))
+            OutlinedButton(onClick = { clock = true }, modifier = Modifier.fillMaxWidth().testTag("reminder-time")) {
+                Icon(Icons.Outlined.Schedule, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp)); Text("Godzina: $time")
+            }
             Text("Godzina według ustawień telefonu. Przypomnienie zobaczysz na głównym pulpicie.", style = MaterialTheme.typography.bodySmall)
             ReminderPermissions()
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("reminder-picker-error")) }
@@ -93,6 +98,26 @@ private fun ReminderPicker(initial: NoteReminder?, onClose: () -> Unit, onSelect
     if (calendar) QueueDatePicker(LocalDate.parse(date), { calendar = false }, {
         date = it.toString(); calendar = false; error = null
     }, title = "Wybierz dzień przypomnienia", calendarTag = "reminder-calendar")
+    if (clock) {
+        val selected = parseProductionTime(time)
+        val state = rememberTimePickerState(selected.hour, selected.minute, is24Hour = true)
+        Dialog(onDismissRequest = { clock = false }) {
+            Surface(shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                Column(Modifier.padding(16.dp).testTag("reminder-clock"), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Wybierz godzinę", style = MaterialTheme.typography.titleMedium)
+                    TimePicker(state)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { clock = false }) { Text("Anuluj") }
+                        TextButton(onClick = {
+                            time = java.time.LocalTime.of(state.hour, state.minute).format(DateTimeFormatter.ofPattern("HH:mm"))
+                            error = null; clock = false
+                        }, modifier = Modifier.testTag("reminder-clock-confirm")) { Text("Wybierz") }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -137,14 +162,13 @@ internal fun DueReminderDialog(item: ReminderItem, saving: Boolean, error: Strin
     Dialog(onDismissRequest = {}, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxWidth().alpha(if (faded) 0.92f else 1f).testTag("due-reminder"), shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Przypomnienie · ${reminderLabel(item.reminder)}", style = MaterialTheme.typography.labelMedium)
-                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
-                        color = if (item.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
+                Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (item.domain == "production") Text(item.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(item.caption, style = MaterialTheme.typography.labelSmall)
                     NoteAuthorLabel(item.author)
-                    Text(item.text, modifier = Modifier.testTag("due-reminder-text"),
+                    Text(item.text.ifBlank { item.title }, modifier = Modifier.testTag("due-reminder-text"), style = MaterialTheme.typography.bodySmall,
                         color = if (item.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

@@ -103,7 +103,7 @@ internal object ReminderScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val body = "${item.caption}\n${item.author?.let { "Autor: $it\n" }.orEmpty()}${item.text}"
         val notification = Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_note_reminder)
-            .setContentTitle(if (item.important) "Pilne: ${item.title}" else item.title).setContentText(item.text)
+            .setContentTitle(if (item.important) "Pilne: ${item.title.ifBlank { "Przypomnienie" }}" else item.title.ifBlank { "Przypomnienie" }).setContentText(item.text)
             .setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(open).setAutoCancel(true)
             .setCategory(Notification.CATEGORY_REMINDER).build()
         try { manager.notify(item.key, 0, notification) } catch (_: SecurityException) { /* Permission changed. Home still shows the note. */ }

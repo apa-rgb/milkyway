@@ -40,16 +40,16 @@ class WorkFlowUiTest {
     }
 
     private fun waitForText(text: String) = compose.waitUntil(timeoutMillis = 10000) {
-        compose.onAllNodesWithText("Tytuł").fetchSemanticsNodes().isEmpty() &&
+        compose.onAllNodesWithTag("work-note-editor").fetchSemanticsNodes().isEmpty() &&
             compose.onAllNodes(hasText(text) and hasAnyAncestor(hasTestTag("notes-list"))).fetchSemanticsNodes().isNotEmpty()
     }
 
-    private fun addEntry(title: String, body: String, button: String) {
+    private fun addEntry(body: String, button: String) {
         compose.onNodeWithText(button).performClick()
-        compose.onNodeWithText("Tytuł").performTextInput(title)
+        compose.onNodeWithText("Tytuł").assertDoesNotExist()
         compose.onNodeWithText("Treść / notatka").performTextInput(body)
         compose.onNodeWithText("Zapisz").performClick()
-        waitForText(title)
+        waitForText(body)
     }
 
     @Test fun choosingShiftOpensPanelAndNotesCanBeEditedCompletedScopedAndRestored() {
@@ -67,15 +67,15 @@ class WorkFlowUiTest {
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
 
         compose.onNodeWithTag("menu-Reminders").performClick()
-        addEntry("Sprawdź wyparkę", "Przekazanie zmiany — uwagi", "Dodaj przypomnienie")
-        compose.onNodeWithText("Sprawdź wyparkę").performClick()
+        addEntry("Przekazanie zmiany — uwagi", "Dodaj przypomnienie")
+        compose.onNodeWithText("Przekazanie zmiany — uwagi").performClick()
         compose.onNodeWithText("Treść / notatka").performTextClearance()
         compose.onNodeWithText("Treść / notatka").performTextInput("Uzupełniona notatka")
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Treść / notatka").assert(hasText("Uzupełniona notatka", substring = true))
         compose.onNodeWithText("Zapisz").performClick()
         waitForText("Uzupełniona notatka")
-        val checkBox = hasAnyAncestor(hasText("Sprawdź wyparkę")) and isToggleable()
+        val checkBox = hasAnyAncestor(hasText("Uzupełniona notatka")) and isToggleable()
         compose.onNode(checkBox).performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithText("Wykonane").fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.recreate()
@@ -87,11 +87,11 @@ class WorkFlowUiTest {
         controlKinds.forEach { compose.onNodeWithTag("control-${it.name}").assertIsDisplayed() }
         screenshot("kontrola-parametrow")
         compose.onNodeWithTag("control-CURRENT_NOTES").performClick()
-        addEntry("Przekazanie zmiany", "Bieżąca notatka do zachowania", "Dodaj notatkę")
+        addEntry("Bieżąca notatka do zachowania", "Dodaj notatkę")
         compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
         compose.onNodeWithTag("control-AIR_CONDITIONING").performClick()
         compose.onNodeWithText("Brak wpisów").assertExists()
-        addEntry("Pomiar temperatury", "Wpis kontrolny", "Dodaj wpis")
+        addEntry("Wpis kontrolny", "Dodaj wpis")
         compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
         compose.onNodeWithTag("control-WASHING").performClick()
         compose.onNodeWithText("Brak wpisów").assertExists()
@@ -114,7 +114,7 @@ class WorkFlowUiTest {
         compose.onNodeWithTag("menu-Controls").performScrollTo().performClick()
         compose.onNodeWithTag("control-CURRENT_NOTES").performClick()
         compose.onNodeWithText("Bieżąca notatka do zachowania").assertExists()
-        compose.onNodeWithContentDescription("Usuń wpis: Przekazanie zmiany").performClick()
+        compose.onNodeWithContentDescription("Usuń wpis: Bieżąca notatka do zachowania").performClick()
         compose.onNodeWithText("Usuń").performClick()
         waitForText("Brak wpisów")
         compose.activityRule.scenario.recreate()
@@ -125,17 +125,17 @@ class WorkFlowUiTest {
         compose.onNodeWithText("Zmiana 1").performClick()
         compose.onNodeWithTag("menu-Notes").assertIsDisplayed().performClick()
         compose.onNodeWithText("Wpisy dla zmiany 1").assertExists()
-        addEntry("Notatka zmiany", "Informacja do przekazania", "Dodaj notatkę")
+        addEntry("Informacja do przekazania", "Dodaj notatkę")
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Informacja do przekazania").assertExists()
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
         compose.onNodeWithTag("menu-Controls").performScrollTo().performClick()
         compose.onNodeWithTag("control-CURRENT_NOTES").performClick()
-        compose.onNodeWithText("Notatka zmiany").performClick()
+        compose.onNodeWithText("Informacja do przekazania").performClick()
         compose.onNodeWithText("Treść / notatka").performTextClearance()
         compose.onNodeWithText("Treść / notatka").performTextInput("Poprawiona informacja")
         compose.onNodeWithText("Zapisz").performClick()
-        waitForText("Notatka zmiany")
+        waitForText("Poprawiona informacja")
         compose.onNodeWithContentDescription("Wróć do kontroli parametrów").performClick()
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
         compose.onNodeWithTag("menu-Notes").performScrollTo().performClick()
@@ -147,7 +147,7 @@ class WorkFlowUiTest {
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Wpisy dla zmiany 2").assertExists()
         compose.onNodeWithText("Brak wpisów").assertExists()
-        compose.onNodeWithText("Notatka zmiany").assertDoesNotExist()
+        compose.onNodeWithText("Poprawiona informacja").assertDoesNotExist()
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
         compose.onNodeWithText("Zmiana 1").performClick()
@@ -159,22 +159,21 @@ class WorkFlowUiTest {
         compose.onNodeWithText("Zmiana 1").performClick()
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
-        compose.onNodeWithText("Tytuł").performTextInput("Ważna informacja")
         compose.onNodeWithText("Treść / notatka").performTextInput("Sprawdzić parametry przed produkcją")
         compose.onNodeWithTag("work-note-important").performScrollTo().performClick()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("work-note-important").performScrollTo().assertIsOn()
+        screenshot("notatka-formularz")
         compose.onNodeWithText("Zapisz").performClick()
-        waitForText("Ważna informacja")
-        compose.onNodeWithText("Ważna informacja", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
+        waitForText("Sprawdzić parametry przed produkcją")
         compose.onNodeWithText("Sprawdzić parametry przed produkcją", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
         screenshot("wazna-notatka-zmiany")
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Ważna informacja").performClick()
+        compose.onNodeWithText("Sprawdzić parametry przed produkcją").performClick()
         compose.onNodeWithText("Treść / notatka").assert(hasText("Sprawdzić parametry przed produkcją", substring = true))
         compose.onNodeWithTag("work-note-important").performScrollTo().assertIsOn().performClick()
         compose.onNodeWithText("Zapisz").performClick()
-        waitForText("Ważna informacja")
+        waitForText("Sprawdzić parametry przed produkcją")
         val model = ViewModelProvider(compose.activity)[WorkNotesViewModel::class.java]
         compose.runOnIdle {
             val note = model.state.value.notes.single()

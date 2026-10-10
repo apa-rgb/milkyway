@@ -1,5 +1,7 @@
 # Milkyway — aplikacja Android
 
+Wersja **0.7.11** wybiera godzinę przypomnienia na **tarczy zegara 24 h**. Otwarte notatki mają mniejszy formularz i tekst, zaokrągloną obwódkę oraz pojedyncze pole treści **bez tytułu**. Kafelki produkcji pokazują pełną nazwę i ilości, osobno godzinę, kod i przyciski. Zawijają tekst zamiast go obcinać; zwykłe kafelki pozostają cienkie, a dłuższe informacje zwiększają wysokość. Podgląd pokazuje dwa całe słowa notatki, a ikona otwiera jej pełną treść.
+
 Wersja **0.7.10** dodaje przycisk **Przypomnienie** na dole, pośrodku formularza notatki. Wybierz dzień z kalendarza i godzinę. O wyznaczonym czasie pulpit pokazuje notatkę z trzema delikatnymi pulsami. **Zrobione** po lewej kończy zadanie dla wszystkich, **OK** pośrodku potwierdza odczyt na danym koncie, a **Pilne** po prawej wyróżnia treść na czerwono. Terminy można ustawiać także dla ogłoszeń i notatek produktu ze wszystkich etapów. Zmiana terminu rozpoczyna nowe przypomnienie, a edycja zachowuje autora i potwierdzenia odczytu.
 
 Wersja **0.7.9** automatycznie nadaje kod w **Proszkowni** przy przenoszeniu zamówienia do produkcji, gestem lub przez formularz. Kod odpowiada dniowi roku z wybranej daty produkcji: **001–366**, np. **283** dla 10.10.2026. Automatyczny kod przelicza się po zmianie daty. Pole nadal pozwala na ręczną edycję lub usunięcie kodu; ręcznie zmienionego kodu aplikacja nie nadpisuje.
@@ -18,22 +20,22 @@ Aplikacja w Kotlinie i Jetpack Compose (Android 8.0 lub nowszy).
 - **Inne:** przycisk na ekranie głównym otwiera Zbiorniki z przewidywaną produkcją oraz Wpisy z przebiegu produkcji dla ostatnio wybranej zmiany. Powrót ze zbiorników lub wpisów prowadzi do Inne, a powrót z tego menu — do ekranu głównego.
 - **Zbiorniki:** opis, pojemność, edytowalna ilość i zawartość, Brix (w masłowni: procent tłuszczu), pH, SH, temperatura, automatyczna data ostatniego napełnienia oraz historia operacji.
 - **Softlab:** miejsce na instrukcję działania programu.
-- **Przypomnienia:** dodawanie, edycja, usuwanie i odznaczanie zadań jako wykonane; każdy wpis ma tytuł, treść notatki, datę zapisu i opcjonalny termin przypomnienia. Notatka pojawia się na pulpicie, a w tle telefon pokazuje powiadomienie otwierające pulpit.
+- **Przypomnienia:** dodawanie, edycja, usuwanie i odznaczanie zadań jako wykonane; każdy nowy wpis ma treść notatki bez tytułu, datę zapisu i opcjonalny termin przypomnienia. Notatka pojawia się na pulpicie, a w tle telefon pokazuje powiadomienie otwierające pulpit.
 - **Kontrola parametrów:** Klimatyzacja, Mycie, Produkcja i Bieżące notatki. W Klimatyzacji, Myciu i Bieżących notatkach można dodawać i poprawiać wpisy. Produkcja otwiera to samo menu kolejki co główny przycisk; wpisy produkcji są dostępne w Inne.
 
 Dane 46 zbiorników pochodzą z arkusza `Zbiorniki.xlsx`. Działy są dostępne w kolejności: Odbieralnia, Aparatownia, Masłownia, Proszkownia i Oleje. Brakujące pojemności wyświetlają się jako „Do uzupełnienia”; w tych zbiornikach nie da się kontrolować maksymalnego stanu. Opis Softlab czeka na uzupełnienie. Katalog jest w `app/src/main/java/pl/apargb/milkyway/Content.kt`.
 
 ## Przypomnienia, kontrola i bieżące notatki
 
-W formularzu można zaznaczyć **Ważne**, aby tytuł i treść były czerwone również po ponownym otwarciu. Edycja pozwala wyłączyć wyróżnienie bez zmiany daty dodania. Ten sam przełącznik działa w ogłoszeniach.
+W formularzu można zaznaczyć **Ważne**, aby treść była czerwona również po ponownym otwarciu. Edycja pozwala wyłączyć wyróżnienie bez zmiany daty dodania. Ten sam przełącznik działa w ogłoszeniach.
 
-Przycisk **Przypomnienie** wybiera przyszły dzień i godzinę według strefy telefonu. Termin dodawany do nowej lub edytowanej notatki zapisuje się wraz z nią po naciśnięciu **Zapisz**. W historii produktu przycisk pod istniejącą notatką zapisuje nowy termin od razu. Historia kodów produkcji pozostaje bez przypomnień. Przerwane przez przypomnienie formularze zachowują wersję roboczą; po **OK** można wrócić do swojej sekcji i dokończyć wpis.
+Przycisk **Przypomnienie** wybiera przyszły dzień z kalendarza i godzinę na zegarku 24 h według strefy telefonu. Termin dodawany do nowej lub edytowanej notatki zapisuje się wraz z nią po naciśnięciu **Zapisz**. W historii produktu przycisk pod istniejącą notatką zapisuje nowy termin od razu. Historia kodów produkcji pozostaje bez przypomnień. Przerwane przez przypomnienie formularze zachowują wersję roboczą; po **OK** można wrócić do swojej sekcji i dokończyć wpis.
 
 Na Androidzie 13+ przy wyborze terminu można włączyć **powiadomienia**, a na Androidzie 12+ — **dokładne przypomnienia**. Bez dostępu do dokładnych alarmów powiadomienie w tle może być opóźnione; otwarta aplikacja pokazuje notatkę o zadanym czasie. Dotknięcie powiadomienia otwiera ekran główny, ale dopiero **OK** zapisuje potwierdzenie odczytu. Aplikacja nie uruchamia samodzielnie ekranu ponad innymi aplikacjami. Terminy telefonu są odtwarzane po restarcie i aktualizacji aplikacji, a wylogowanie usuwa jego alarmy i powiadomienia. Androidowe wymuszenie zatrzymania aplikacji wstrzymuje alarmy do jej ponownego otwarcia.
 
 Terminy i statusy korzystają z dotychczasowych wspólnych pól treści, bez migracji ani zmiany reguł Firebase. **OK** jest osobne dla kont 01–10; lokalnie dotyczy tego telefonu. **Zrobione** jest wspólne, a w przypomnieniach i ogłoszeniach zaznacza również wykonanie wpisu. Notatki i pomiary pozostają widoczne po zakończeniu przypomnienia. **Pilne** pozostawia je do potwierdzenia. Synchronizacja wymaga połączenia i zalogowania; alarmy w tle dotyczą notatek już pobranych przez telefon, więc nowy wpis z innego urządzenia powinien zostać zsynchronizowany podczas otwarcia aplikacji. Wszystkie telefony należy zaktualizować, aby starszy formularz nie nadpisał statusu odczytu.
 
-Wpisy są przypisane do wybranej zmiany i sekcji; przełączenie zmiany pokazuje jej własne przypomnienia i notatki. Tytuł może mieć do 120 znaków, treść do 10 000. Dotknięcie wpisu otwiera edycję, checkbox oznacza wykonanie przypomnienia, a ikona kosza umożliwia usunięcie po potwierdzeniu. W trybie lokalnym notatki i data ostatniej zmiany zapisują się w osobnej bazie SQLite. Po podłączeniu Firebase wpisy korzystają ze wspólnej bazy zakładu. Stany zbiorników są wspólne dla wszystkich zmian.
+Wpisy są przypisane do wybranej zmiany i sekcji; przełączenie zmiany pokazuje jej własne przypomnienia i notatki. Nowa notatka wymaga treści, do 10 000 znaków. Tytuły starszych wpisów pozostają zachowane w danych; formularz nie ma pola tytułu. Dotknięcie wpisu otwiera edycję, checkbox oznacza wykonanie przypomnienia, a ikona kosza umożliwia usunięcie po potwierdzeniu. W trybie lokalnym notatki i data ostatniej zmiany zapisują się w osobnej bazie SQLite. Po podłączeniu Firebase wpisy korzystają ze wspólnej bazy zakładu. Stany zbiorników są wspólne dla wszystkich zmian.
 
 ## Laboratorium i pochodzenie pomiarów
 

@@ -1,11 +1,10 @@
 package pl.apargb.milkyway
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -20,8 +19,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -126,22 +123,25 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
                 items(notes, key = { it.id }) { note ->
                     Card(onClick = { if (!ui.saving) { model.clearError(); editingId = note.id } },
                         modifier = Modifier.fillMaxWidth().testTag("note-${note.id}"), shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (kind == NoteKind.REMINDER) Checkbox(checked = note.completed,
                                     onCheckedChange = { model.setCompleted(note, it) }, enabled = !ui.saving,
                                     modifier = Modifier.testTag("done-${note.id}"))
-                                Text(note.title, Modifier.weight(1f), fontWeight = FontWeight.Bold,
-                                    color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface,
-                                    textDecoration = if (note.completed) TextDecoration.LineThrough else TextDecoration.None)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (note.title.isNotBlank()) Text(note.title, fontWeight = FontWeight.Bold,
+                                        color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface,
+                                        textDecoration = if (note.completed) TextDecoration.LineThrough else TextDecoration.None)
+                                    if (note.visibleBody.isNotBlank()) Text(note.visibleBody, style = MaterialTheme.typography.bodyMedium,
+                                        color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 4, overflow = TextOverflow.Ellipsis)
+                                }
                                 IconButton(onClick = { deletingId = note.id }, enabled = !ui.saving) {
-                                    Icon(Icons.Outlined.DeleteOutline, "Usuń wpis: ${note.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Icon(Icons.Outlined.DeleteOutline, "Usuń wpis: ${note.title.ifBlank { note.visibleBody.take(80) }}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            if (note.visibleBody.isNotBlank()) Text(note.visibleBody, style = MaterialTheme.typography.bodyMedium,
-                                color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 4, overflow = TextOverflow.Ellipsis)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(noteDate(note.updatedAt), style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -163,59 +163,39 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
     }
     notes.find { it.id == deletingId }?.let { note ->
         AlertDialog(onDismissRequest = { deletingId = null }, title = { Text("Usunąć wpis?") },
-            text = { Text(note.title) }, confirmButton = {
+            text = { Text(note.title.ifBlank { note.visibleBody }) }, confirmButton = {
                 TextButton(onClick = { model.delete(note); deletingId = null }, enabled = !ui.saving) { Text("Usuń") }
             }, dismissButton = { TextButton(onClick = { deletingId = null }) { Text("Anuluj") } })
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scope: Int, ui: WorkNotesState,
                            model: WorkNotesViewModel, onClose: () -> Unit,
                            pageTitle: String = kind.title, addLabel: String = kind.addLabel) {
-    var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
-    var body by rememberSaveable { mutableStateOf(initial?.visibleBody ?: "") }
+    var body by rememberSaveable { mutableStateOf(initial?.visibleBody?.takeIf { it.isNotBlank() } ?: initial?.title.orEmpty()) }
     var important by rememberSaveable { mutableStateOf(initial?.important ?: false) }
     var reminderMetadata by rememberSaveable { mutableStateOf(initial?.reminder?.let { withNoteReminder("", it) }.orEmpty()) }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
-    Dialog(onDismissRequest = { if (!ui.saving) onClose() },
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Scaffold(topBar = { TopAppBar(title = { Text(if (initial == null) addLabel else "Edytuj wpis") }) },
-            bottomBar = {
-                Column {
-                    ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) }
-                    Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = onClose, enabled = !ui.saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
-                        Button(onClick = { model.save(requestId, id, scope, kind, title, withNoteReminder(withImportantText(body, important), noteReminder(reminderMetadata))) },
-                            enabled = !ui.saving && title.isNotBlank(), modifier = Modifier.weight(1f)) {
-                            Text(if (ui.saving) "Zapisywanie…" else "Zapisz")
-                        }
-                    }
-                }
-            }) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(if (scope == 0) pageTitle else "$pageTitle · Zmiana $scope", color = kind.tone().accent)
-                NoteAuthorLabel(if (initial == null) currentNoteAuthor() else initial.author, Modifier.testTag("work-note-editor-author"))
-                OutlinedTextField(value = title, onValueChange = { title = it.take(120); model.clearError() },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
-                    label = { Text("Tytuł") }, enabled = !ui.saving, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = body, onValueChange = { body = it.take(10000); model.clearError() },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
-                    label = { Text("Treść / notatka") }, enabled = !ui.saving,
-                    modifier = Modifier.fillMaxWidth(), minLines = 7, shape = RoundedCornerShape(14.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(important, { important = it }, enabled = !ui.saving, modifier = Modifier.testTag("work-note-important"))
-                    Text("Ważne", color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
-                }
-                Text("Data zapisu uzupełnia się automatycznie.", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    TankFormDialog(if (initial == null) addLabel else "Edytuj wpis", ui.saving, body.isNotBlank(), onClose,
+        onSave = { model.save(requestId, id, scope, kind, initial?.title.orEmpty(),
+            withNoteReminder(withImportantText(body, important), noteReminder(reminderMetadata))) }, compact = true,
+        footer = { ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) } }) {
+        Column(Modifier.testTag("work-note-editor"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(if (scope == 0) pageTitle else "$pageTitle · Zmiana $scope", style = MaterialTheme.typography.labelMedium, color = kind.tone().accent)
+            NoteAuthorLabel(if (initial == null) currentNoteAuthor() else initial.author, Modifier.testTag("work-note-editor-author"))
+            OutlinedTextField(value = body, onValueChange = { body = it.take(10000); model.clearError() },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
+                label = { Text("Treść / notatka", style = MaterialTheme.typography.bodySmall) }, enabled = !ui.saving,
+                modifier = Modifier.fillMaxWidth().testTag("work-note-input"), minLines = 3, maxLines = 6, shape = RoundedCornerShape(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(important, { important = it }, enabled = !ui.saving, modifier = Modifier.testTag("work-note-important"))
+                Text("Ważne", style = MaterialTheme.typography.bodySmall, color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
             }
+            Text("Data zapisu uzupełnia się automatycznie.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
 }

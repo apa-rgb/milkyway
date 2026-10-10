@@ -21,17 +21,17 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     val notes = ui.productNotes.filter { it.entryId == entry.id }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
-    TankFormDialog("Notatki produktu", saving = ui.saving, canSave = text.isNotBlank(), onClose = onClose,
+    TankFormDialog("Notatki produktu", saving = ui.saving, canSave = text.isNotBlank(), onClose = onClose, compact = true,
         onSave = { model.addProductNote(requestId, entry, stage, withNoteReminder(withImportantText(text, important), noteReminder(reminderMetadata))) },
         footer = { ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) } }, content = {
             Column(Modifier.testTag("product-notes-dialog"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
+                Text(entry.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
                 Text("${entry.line.title} · ${stage.title}", style = MaterialTheme.typography.bodySmall)
                 NoteAuthorLabel(currentNoteAuthor(), Modifier.testTag("product-note-new-author"))
-                OutlinedTextField(text, onValueChange = { text = it.take(4000); model.clearError() }, label = { Text("Nowa notatka") },
-                    modifier = Modifier.fillMaxWidth().testTag("product-note-input"), minLines = 3, enabled = !ui.saving,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
-                    shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(text, onValueChange = { text = it.take(4000); model.clearError() }, label = { Text("Nowa notatka", style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.fillMaxWidth().testTag("product-note-input"), minLines = 3, maxLines = 5, enabled = !ui.saving,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
+                    shape = RoundedCornerShape(20.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(important, { important = it }, enabled = !ui.saving, modifier = Modifier.testTag("product-note-important"))
                     Text("Ważne", color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
@@ -42,7 +42,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                 Text("Notatki ze wszystkich etapów", fontWeight = FontWeight.SemiBold)
                 if (entry.planDescription.isNotBlank()) {
                     Text("Plan / uwagi", style = MaterialTheme.typography.labelMedium, color = entry.line.tone.accent)
-                    Text(entry.planDescription)
+                    Text(entry.planDescription, style = MaterialTheme.typography.bodyMedium)
                 }
                 if (notes.isEmpty()) Text("Brak dodatkowych notatek", style = MaterialTheme.typography.bodySmall)
                 notes.forEach { note ->
@@ -59,6 +59,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                                     color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(note.visibleText, modifier = Modifier.testTag("product-note-${note.id}"),
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
                             if (!note.isProductionCode()) ReminderButton(note.reminder, !ui.saving, "product-note-reminder-${note.id}") {
                                 model.scheduleReminder(note, it)

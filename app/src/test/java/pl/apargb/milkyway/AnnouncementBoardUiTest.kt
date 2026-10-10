@@ -47,14 +47,13 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithText("Wczorajsze ogłoszenie").assertDoesNotExist()
         compose.onNodeWithText("Przypomnienie zmiany").assertDoesNotExist()
         compose.onNodeWithTag("announcements-add").performClick()
-        compose.onNodeWithText("Tytuł").performTextInput("Informacja dla wszystkich")
         compose.onNodeWithText("Treść / notatka").performTextInput("Przegląd instalacji rano")
         compose.onNodeWithTag("work-note-important").performScrollTo().performClick()
         compose.onNodeWithText("Zapisz").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("announcement-status-yesterday").fetchSemanticsNodes().isEmpty() &&
-            compose.onAllNodesWithText("Tytuł").fetchSemanticsNodes().isEmpty() &&
-            compose.runOnIdle { model.state.value.notes.any { it.title == "Informacja dla wszystkich" } } }
-        val note = compose.runOnIdle { model.state.value.notes.single { it.title == "Informacja dla wszystkich" } }
+            compose.onAllNodesWithTag("work-note-editor").fetchSemanticsNodes().isEmpty() &&
+            compose.runOnIdle { model.state.value.notes.any { it.visibleBody == "Przegląd instalacji rano" } } }
+        val note = compose.runOnIdle { model.state.value.notes.single { it.visibleBody == "Przegląd instalacji rano" } }
         compose.onNodeWithText("Przegląd instalacji rano", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
         compose.onNodeWithTag("announcement-created-${note.id}", true).assertTextEquals("Dodano: ${announcementTimestamp(note.createdAt)}")
         compose.onNodeWithTag("announcement-done-${note.id}").performClick()
@@ -64,7 +63,7 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithText("Treść / notatka").performTextClearance()
         compose.onNodeWithText("Treść / notatka").performTextInput("Zaktualizowane ogłoszenie")
         compose.onNodeWithText("Zapisz").performClick()
-        compose.waitUntil(10000) { compose.onAllNodesWithText("Tytuł").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("work-note-editor").fetchSemanticsNodes().isEmpty() }
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Zaktualizowane ogłoszenie", useUnmergedTree = true).assertTextColor(ImportantNoteColor)
         compose.onNodeWithTag("announcement-done-${note.id}").assertIsOn()

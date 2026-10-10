@@ -414,26 +414,29 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val background = productionCardBackground(entry)
     val note = latestNote?.visibleText?.takeIf { it.isNotBlank() } ?: entry.planDescription
-    val preview = if (entry.pendingOrder) orderNotePreview(note) else note.trim().replace(Regex("[\\s\\u00a0]+"), " ")
+    // Show whole preview words; the note icon opens the complete text.
+    val preview = orderNotePreview(note)
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 24.dp) {
-        Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().height(72.dp * fontScale).testTag("queue-entry-${entry.id}")
+        Surface(onClick = onEdit, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp * fontScale).testTag("queue-entry-${entry.id}")
             .onGloballyPositioned { updateBounds(it.boundsInRoot()) }, color = background, shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, entry.line.tone.accent.copy(alpha = .34f))) {
-            Column(Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Row(Modifier.fillMaxWidth().height(24.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(title, modifier = Modifier.weight(1f).testTag("queue-edit-${entry.id}")
-                        .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
-                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
+            Column(Modifier.padding(horizontal = 5.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(title, modifier = Modifier.fillMaxWidth().testTag("queue-edit-${entry.id}")
+                    .clickable(enabled = enabled, onClickLabel = "Edytuj: ${entry.title}", onClick = onEdit),
+                    style = MaterialTheme.typography.labelLarge.copy(lineHeight = 14.sp), fontWeight = FontWeight.Bold,
+                    color = entry.line.tone.accent)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(preview.ifBlank { "—" }, modifier = Modifier.weight(1f).testTag("queue-note-preview-${entry.id}"),
+                        style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp),
+                        color = if (latestNote?.important == true) ImportantNoteColor else MaterialTheme.colorScheme.onSurfaceVariant)
                     entry.butterKind?.let { kind ->
                         Surface(shape = RoundedCornerShape(4.dp), color = entry.line.tone.accent.copy(alpha = .09f)) {
-                            Text(kind.title, Modifier.padding(horizontal = 4.dp, vertical = 2.dp).testTag("queue-kind-${entry.id}"),
-                                style = MaterialTheme.typography.labelSmall, color = entry.line.tone.accent, maxLines = 1)
+                            Text(kind.title, Modifier.padding(horizontal = 3.dp, vertical = 2.dp).testTag("queue-kind-${entry.id}"),
+                                style = MaterialTheme.typography.labelSmall, color = entry.line.tone.accent)
                         }
                     }
                     if (entry.line == ProductionLine.POWDER) {
-                        OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(34.dp).height(22.dp).testTag("queue-code-${entry.id}"),
+                        OutlinedButton(onClick = onCode, enabled = enabled, modifier = Modifier.width(34.dp).height(24.dp).testTag("queue-code-${entry.id}"),
                             shape = RoundedCornerShape(5.dp), contentPadding = PaddingValues(0.dp)) {
                             Text(code.ifEmpty { "Kod" }, style = MaterialTheme.typography.labelSmall)
                         }
@@ -441,32 +444,25 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(24.dp).testTag("product-notes-${entry.id}")) {
                         Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(15.dp), tint = entry.line.tone.accent)
                     }
-                }
-                Row(Modifier.fillMaxWidth().height(14.dp * fontScale), horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Text(preview.ifBlank { "—" }, modifier = Modifier.weight(1f).testTag("queue-note-preview-${entry.id}"),
-                        style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        color = if (latestNote?.important == true) ImportantNoteColor else MaterialTheme.colorScheme.onSurfaceVariant)
-                    entry.scheduledTime?.let { time ->
-                        Text(time.toString(), modifier = Modifier.testTag("queue-time-${entry.id}"), style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1, color = entry.line.tone.accent)
-                    }
-                }
-                Row(Modifier.fillMaxWidth().height(24.dp * fontScale), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
-                            Modifier.testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
-                            style = MaterialTheme.typography.labelSmall.copy(lineHeight = 12.sp), maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, color = entry.line.tone.accent)
-                        if (entry.producedAmount.signum() > 0) Text("Wykonano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}",
-                            style = MaterialTheme.typography.labelSmall.copy(lineHeight = 12.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
                     if (!entry.pendingOrder && entry.date == LocalDate.now()) {
                         IconButton(onClick = onComplete, enabled = enabled && entry.remainingAmount?.signum() == 1,
                             modifier = Modifier.size(24.dp).testTag("queue-produced-${entry.id}")) {
                             Icon(Icons.Outlined.TaskAlt, "Wyprodukowano: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)
                         }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text(entry.remainingAmount?.let { "${if (entry.pendingOrder) "Oczekuje" else "Pozostało"}: ${decimalLabel(it)} ${entry.unit.label}" } ?: "Uzupełnij ilość",
+                            Modifier.fillMaxWidth().testTag("queue-${if (entry.pendingOrder) "pending-remaining" else "remaining"}-${entry.id}"),
+                            style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp), color = entry.line.tone.accent)
+                        if (entry.producedAmount.signum() > 0) Text("Wykonano: ${decimalLabel(entry.producedAmount)} ${entry.unit.label}",
+                            modifier = Modifier.fillMaxWidth(),
+                            style = MaterialTheme.typography.labelSmall.copy(lineHeight = 14.sp))
+                    }
+                    entry.scheduledTime?.let { time ->
+                        Text(time.toString(), modifier = Modifier.testTag("queue-time-${entry.id}"),
+                            style = MaterialTheme.typography.labelSmall, color = entry.line.tone.accent)
                     }
                 }
             }

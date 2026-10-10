@@ -36,6 +36,19 @@ class WorkNotesRepositoryTest {
         assertEquals(listOf(note), repository.load())
     }
 
+    @Test fun titlelessNoteSurvivesReopeningAndEmptyOrMetadataOnlyContentIsRejected() {
+        repository.save("note", 1, NoteKind.CURRENT_NOTES, "", "Treść bez tytułu", 100L, "Anna")
+        repository.close(); repository = WorkNotesRepository(context)
+        val note = repository.load().single()
+        assertEquals("", note.title); assertEquals("Treść bez tytułu", note.visibleBody); assertEquals("Anna", note.author)
+        listOf("  ", withImportantText("", true), withNoteAuthor("", "Anna")).forEach { body ->
+            assertThrows(IllegalArgumentException::class.java) {
+                repository.save("note", 1, NoteKind.CURRENT_NOTES, "", body, 200L)
+            }
+        }
+        assertEquals(note, repository.load().single())
+    }
+
     @Test fun entriesKeepTheirShiftAndCategoryAndCannotBeMovedByEditingTheirId() {
         repository.save("shift-one", 1, NoteKind.REMINDER, "A", "", 100L)
         repository.save("shift-two", 2, NoteKind.REMINDER, "B", "", 200L)

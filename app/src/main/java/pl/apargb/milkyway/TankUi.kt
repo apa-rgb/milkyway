@@ -1,5 +1,6 @@
 package pl.apargb.milkyway
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -299,16 +300,20 @@ fun TankOperationDialog(tank: Tank, mode: TankEditor, ui: InventoryUiState, shif
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TankFormDialog(title: String, saving: Boolean, canSave: Boolean, onClose: () -> Unit,
-                           onSave: () -> Unit, footer: @Composable () -> Unit = {}, content: @Composable () -> Unit) {
+                           onSave: () -> Unit, footer: @Composable () -> Unit = {}, compact: Boolean = false,
+                           content: @Composable () -> Unit) {
     Dialog(onDismissRequest = { if (!saving) onClose() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Surface(Modifier.fillMaxSize()) {
+        Surface(if (compact) Modifier.fillMaxWidth().padding(horizontal = 12.dp).imePadding().fillMaxHeight(.78f) else Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(if (compact) 24.dp else 0.dp),
+            border = if (compact) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null) {
             Scaffold(
-                topBar = { TopAppBar(title = { Text(title) }) },
+                topBar = { if (compact) Text(title, Modifier.padding(16.dp), style = MaterialTheme.typography.titleSmall)
+                    else TopAppBar(title = { Text(title) }) },
                 bottomBar = {
                     Column {
                         footer()
-                        Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
+                        Row(Modifier.fillMaxWidth().navigationBarsPadding().then(if (compact) Modifier else Modifier.imePadding()).padding(16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedButton(onClick = onClose, enabled = !saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
                             Button(onClick = onSave, enabled = !saving && canSave, modifier = Modifier.weight(1f).testTag("form-save-$title")) {
@@ -318,7 +323,7 @@ internal fun TankFormDialog(title: String, saving: Boolean, canSave: Boolean, on
                     }
                 }
             ) { padding ->
-                Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp)) { content() }
+                Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(if (compact) 14.dp else 20.dp)) { content() }
             }
         }
     }
