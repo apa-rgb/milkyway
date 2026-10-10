@@ -99,6 +99,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
     var editorTankId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorMode by rememberSaveable { mutableStateOf(TankEditor.STATE.name) }
     var routingTankId by rememberSaveable { mutableStateOf<String?>(null) }
+    var resetTankId by rememberSaveable { mutableStateOf<String?>(null) }
     var oilTypeTankId by rememberSaveable { mutableStateOf<String?>(null) }
     var detailsTankId by rememberSaveable { mutableStateOf<String?>(null) }
     var sectionName by rememberSaveable { mutableStateOf(Section.Home.name) }
@@ -155,7 +156,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
             else -> Section.Dashboard.name
         }
     }
-    BackHandler(enabled = section != Section.Home && editorTankId == null && routingTankId == null && oilTypeTankId == null && detailsTankId == null && history.tankId == null && topUps.tankId == null) { goBack() }
+    BackHandler(enabled = section != Section.Home && editorTankId == null && routingTankId == null && oilTypeTankId == null && resetTankId == null && detailsTankId == null && history.tankId == null && topUps.tankId == null) { goBack() }
     fun openEditor(tank: Tank, mode: TankEditor) {
         inventoryModel.clearError()
         editorTankId = tank.id
@@ -198,13 +199,14 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         bottomBar = { if (cloud.configured || section == Section.Home) CloudStatus(cloud, saving) }
     ) { padding ->
         pageState.SaveableStateProvider("$sectionName:$selectedShift:$controlName:$productionDestinationName") {
-            if (section == Section.Tanks) {
+            if (section == Section.Tanks || section == Section.Other && productionDestination == ProductionDestination.TANKS) {
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     TankDepartmentPage(Department.valueOf(departmentName), inventory,
                         onDepartment = { departmentName = it.name }, onTank = { detailsTankId = it.id },
                         onEdit = { openEditor(it, TankEditor.STATE) },
                         onOilType = { inventoryModel.clearError(); oilTypeTankId = it.id },
-                        onRouting = { inventoryModel.clearError(); routingTankId = it.id }, onRetry = inventoryModel::reload)
+                        onRouting = { inventoryModel.clearError(); routingTankId = it.id }, onRetry = inventoryModel::reload,
+                        onReset = { inventoryModel.clearError(); resetTankId = it.id }, today = java.time.Instant.ofEpochMilli(reminderNow).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
                 }
             } else if (section == Section.Laboratory) {
                 Box(Modifier.fillMaxSize().padding(padding)) {
@@ -311,7 +313,8 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                 onHistory = { inventoryModel.showHistory(tank.id) },
                 onTopUps = { inventoryModel.showTopUps(tank.id) },
                 onRouting = { inventoryModel.clearError(); routingTankId = tank.id },
-                onOilType = { inventoryModel.clearError(); oilTypeTankId = tank.id })
+                onOilType = { inventoryModel.clearError(); oilTypeTankId = tank.id },
+                today = java.time.Instant.ofEpochMilli(reminderNow).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
         }
     }
     AppContent.tanks.find { it.id == editorTankId }?.let { tank ->
@@ -335,6 +338,9 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         key(tank.id) {
             TankOilTypeDialog(tank, inventory, inventoryModel, selectedShift.takeIf { it != 0 }, onClose = { oilTypeTankId = null })
         }
+    }
+    AppContent.tanks.find { it.id == resetTankId }?.let { tank ->
+        key(tank.id) { TankResetDialog(tank, inventory, inventoryModel, selectedShift.takeIf { it != 0 }) { resetTankId = null } }
     }
     due?.let { item ->
         DueReminderDialog(item, notes.saving || queue.saving,

@@ -148,14 +148,53 @@ internal class InventoryRepository(context: Context, private val helper: Invento
 
     @Synchronized fun close() = helper.close()
 
-    private fun readStates(db: SQLiteDatabase): Map<String, TankStatus> =
-        db.query("tank_states", null, null, null, null, null, null).use { cursor ->
+    private fun readStates(db: SQLiteDatabase): Map<String, TankStatus> {
+        val batches = readOilBatches(db)
+        return db.query("tank_states", null, null, null, null, null, null).use { cursor ->
             buildMap {
                 while (cursor.moveToNext()) put(cursor.string("tank_id")!!,
                     TankStatus(cursor.decimal("litres"), cursor.measurements(), cursor.longOrNull("filled_at"), cursor.routing(),
-                        cursor.string("material")!!, cursor.string("oil_type")!!, cursor.longOrNull("laboratory_at")))
+                        cursor.string("material")!!, cursor.string("oil_type")!!, cursor.longOrNull("laboratory_at"),
+                        batches[cursor.string("tank_id")] ?: OilBatch()))
             }
         }
+    }
+
+    private fun readOilBatches(db: SQLiteDatabase): Map<String, OilBatch> {
+        val ids = AppContent.tanks.filter { it.isOilTank }.map { it.id }.toSet()
+        val placeholders = ids.joinToString(",") { "?" }
+        val batches = mutableMapOf<String, OilBatch>()
+        val quantities = mutableMapOf<String, BigDecimal>()
+        db.query("movements", null, "target_id IN ($placeholders) OR source_id IN ($placeholders)",
+            (ids.toList() + ids.toList()).toTypedArray(), null, null, "rowid ASC").use { cursor ->
+            while (cursor.moveToNext()) {
+                val event = cursor.movement()
+                if (event.targetId in ids) {
+                    when (event.type) {
+                        MovementType.OIL_TYPE -> {
+                            event.note.oilBatchOrNull()?.let { batches[event.targetId] = it }
+                            event.previousLitres?.let { quantities[event.targetId] = it }
+                        }
+                        MovementType.SET_STATE -> {
+                            quantities[event.targetId] = event.litres
+                            if (event.litres.signum() == 0) batches[event.targetId] = OilBatch()
+                        }
+                        MovementType.RECEIPT, MovementType.TRANSFER -> quantities[event.targetId] =
+                            (event.previousLitres ?: BigDecimal.ZERO) + event.litres
+                        else -> Unit
+                    }
+                }
+                if (event.type == MovementType.TRANSFER && event.sourceId in ids) {
+                    quantities[event.sourceId]?.let { before ->
+                        val remaining = before - event.litres
+                        quantities[event.sourceId!!] = remaining
+                        if (remaining.signum() == 0) batches[event.sourceId] = OilBatch()
+                    }
+                }
+            }
+        }
+        return batches
+    }
 }
 
 private fun Measurements.values() = ContentValues().apply {

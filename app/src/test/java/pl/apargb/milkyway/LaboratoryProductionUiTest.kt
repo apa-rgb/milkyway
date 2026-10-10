@@ -136,7 +136,7 @@ class LaboratoryProductionUiTest {
         compose.onNodeWithText("Wpisy dla zmiany 1").assertExists()
         compose.onNodeWithText("Brak wpisów").assertExists()
         compose.onNodeWithContentDescription("Wróć do innych").performClick()
-        compose.onNodeWithTag("other-tanks").performClick()
+        compose.onNodeWithTag("other-estimates").performClick()
         compose.onNodeWithTag("estimate-Silos 1", useUnmergedTree = true).assert(hasText("≈ 200 kg"))
         compose.onNodeWithTag("production-settings").performClick()
         compose.onNodeWithText("Gęstość materiału [kg/l]").performTextClearance()

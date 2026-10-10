@@ -393,4 +393,52 @@ class InventoryRepositoryTest {
         repository.apply { it.updateMeasurements("M-Tank 1", saved.measurements, 500L) }
         assertEquals(500L, repository.load().states.getValue("M-Tank 1").laboratoryMeasuredAt)
     }
+
+    @Test fun oilDatesSurviveReopenManyTopUpsAndResetKeepsHistory() {
+        val batch = OilBatch(java.time.LocalDate.of(2026, 10, 1), java.time.LocalDate.of(2026, 10, 12))
+        repository.apply { it.setState("Olej 12", BigDecimal("10"), Measurements(temperature = BigDecimal("20")), 100L) }
+        repository.apply { it.setOilBatch("Olej 12", "Rzepakowy", batch, 200L) }
+        repeat(110) { n -> repository.apply { it.receive("Olej 12", BigDecimal.ONE, "Dostawa", Measurements(), 300L + n) } }
+        repository.close()
+        repository = InventoryRepository(context)
+        assertEquals(batch, repository.load().states.getValue("Olej 12").oilBatch)
+        assertEquals(409L, repository.load().states.getValue("Olej 12").filledAt)
+        val before = repository.load()
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.apply { it.setOilBatch("Olej 12", "Błędny", batch.copy(expiresOn = batch.producedOn!!.minusDays(1)), 500L) }
+        }
+        assertEquals(before, repository.load())
+        repository.apply("reset-oil") { it.resetTank("Olej 12", 600L) }
+        repository.apply("reset-oil") { it.resetTank("Olej 12", 600L) }
+        assertEquals(TankStatus(litres = BigDecimal.ZERO), repository.load().states.getValue("Olej 12"))
+        assertEquals(110, repository.topUps("Olej 12").totalCount)
+        assertEquals(113, repository.history("Olej 12", 200).size)
+        repository.apply { it.receive("Olej 12", BigDecimal.ONE, "Nowa partia", Measurements(), 700L) }
+        assertEquals(OilBatch(), repository.load().states.getValue("Olej 12").oilBatch)
+        assertEquals(700L, repository.load().states.getValue("Olej 12").filledAt)
+    }
+
+    @Test fun emptyingOilByTransferOrManualZeroRemovesDatesBeforeRefilling() {
+        val batch = OilBatch(expiresOn = java.time.LocalDate.of(2026, 10, 12))
+        repository.apply { it.setState("Olej 12", BigDecimal("10"), Measurements(), 100L) }
+        repository.apply { it.setState("Olej 13", BigDecimal.ZERO, Measurements(), 100L) }
+        repository.apply { it.setOilBatch("Olej 12", "Rzepakowy", batch, 200L) }
+        repository.apply { it.transfer("Olej 12", "Olej 13", BigDecimal("10"), Measurements(), 300L) }
+        repository.apply { it.receive("Olej 12", BigDecimal.ONE, "Dostawa", Measurements(), 400L) }
+        assertEquals(OilBatch(), repository.load().states.getValue("Olej 12").oilBatch)
+        repository.apply { it.setOilBatch("Olej 12", "Rzepakowy", batch, 500L) }
+        repository.apply { it.setState("Olej 12", BigDecimal.ZERO, Measurements(), 600L) }
+        repository.apply { it.receive("Olej 12", BigDecimal.ONE, "Dostawa", Measurements(), 700L) }
+        assertEquals(OilBatch(), repository.load().states.getValue("Olej 12").oilBatch)
+    }
+
+
+    @Test fun datesClearOnTransferFromExistingStockWithoutEarlierMovementHistory() {
+        database.writableDatabase.execSQL("INSERT INTO tank_states(tank_id, litres) VALUES ('Olej 12', '10')")
+        repository.apply { it.setState("Olej 13", BigDecimal.ZERO, Measurements(), 1L) }
+        repository.apply { it.setOilBatch("Olej 12", "Rzepakowy", OilBatch(expiresOn = java.time.LocalDate.of(2026, 10, 12)), 2L) }
+        repository.apply { it.transfer("Olej 12", "Olej 13", BigDecimal("10"), Measurements(), 3L) }
+        repository.apply { it.receive("Olej 12", BigDecimal.ONE, "Dostawa", Measurements(), 4L) }
+        assertEquals(OilBatch(), repository.load().states.getValue("Olej 12").oilBatch)
+    }
 }

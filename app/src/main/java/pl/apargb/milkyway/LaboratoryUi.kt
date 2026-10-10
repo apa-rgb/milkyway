@@ -97,8 +97,8 @@ fun LaboratoryPage(ui: InventoryUiState, model: InventoryViewModel, shift: Int, 
                                 Text(status.litres?.let { "Stan: ${decimalLabel(it)} l" } ?: "Stan nieustalony", style = MaterialTheme.typography.bodySmall)
                                 val first = if (tank.usesFatMeasurement) "Tłuszcz: ${status.measurements.fatPercent?.let(::decimalLabel) ?: "—"} %"
                                     else "Brix: ${status.measurements.brix?.let(::decimalLabel) ?: "—"} °Bx"
-                                Text(first, style = MaterialTheme.typography.bodySmall)
-                                Text("pH: ${status.measurements.ph?.let(::decimalLabel) ?: "—"} · SH: ${status.measurements.sh?.let(::decimalLabel) ?: "—"} · Temp.: ${status.measurements.temperature?.let(::decimalLabel) ?: "—"} °C",
+                                if (!tank.isOilTank) Text(first, style = MaterialTheme.typography.bodySmall)
+                                Text((if (tank.isOilTank) "" else "pH: ${status.measurements.ph?.let(::decimalLabel) ?: "—"} · SH: ${status.measurements.sh?.let(::decimalLabel) ?: "—"} · ") + "Temp.: ${status.measurements.temperature?.let(::decimalLabel) ?: "—"} °C",
                                     style = MaterialTheme.typography.bodySmall)
                             }
                         }
@@ -127,9 +127,9 @@ private fun LaboratoryMeasurementsDialog(tank: Tank, ui: InventoryUiState, model
         onClose = onClose, onSave = {
             try {
                 val value = parseDecimal(mainValue, if (tank.usesFatMeasurement) "Tłuszcz" else "Brix")
-                val measurements = Measurements(brix = if (tank.usesFatMeasurement) null else value,
-                    fatPercent = if (tank.usesFatMeasurement) value else null, ph = parseDecimal(ph, "pH"),
-                    sh = parseDecimal(sh, "SH"), temperature = parseDecimal(temperature, "Temperatura"))
+                val measurements = Measurements(brix = if (tank.usesFatMeasurement || tank.isOilTank) null else value,
+                    fatPercent = if (tank.usesFatMeasurement) value else null, ph = if (tank.isOilTank) null else parseDecimal(ph, "pH"),
+                    sh = if (tank.isOilTank) null else parseDecimal(sh, "SH"), temperature = parseDecimal(temperature, "Temperatura"))
                 model.save(requestId) { it.updateMeasurements(tank.id, measurements, System.currentTimeMillis(), shift) }
             } catch (error: IllegalArgumentException) { model.showError(error.message ?: "Sprawdź wpisane dane.") }
         }, content = {
@@ -137,9 +137,9 @@ private fun LaboratoryMeasurementsDialog(tank: Tank, ui: InventoryUiState, model
                 Text(state.litres?.let { "Stan: ${decimalLabel(it)} l" } ?: "Stan nieustalony")
                 if (state.litres?.signum() == 0) Text("Zbiornik jest pusty. Ustal ilość materiału w zakładce Zbiorniki.", color = MaterialTheme.colorScheme.error)
                 Text("Zapis pomiaru zachowuje ilość, zawartość i datę napełnienia. Czas pomiaru trafia do historii.", style = MaterialTheme.typography.bodySmall)
-                NumberField(if (tank.usesFatMeasurement) "Tłuszcz [%]" else "Brix [°Bx]", mainValue, !ui.saving) { mainValue = it; model.clearError() }
-                NumberField("pH", ph, !ui.saving) { ph = it; model.clearError() }
-                NumberField("SH", sh, !ui.saving) { sh = it; model.clearError() }
+                if (!tank.isOilTank) NumberField(if (tank.usesFatMeasurement) "Tłuszcz [%]" else "Brix [°Bx]", mainValue, !ui.saving) { mainValue = it; model.clearError() }
+                if (!tank.isOilTank) NumberField("pH", ph, !ui.saving) { ph = it; model.clearError() }
+                if (!tank.isOilTank) NumberField("SH", sh, !ui.saving) { sh = it; model.clearError() }
                 NumberField("Temperatura [°C]", temperature, !ui.saving, signed = true) { temperature = it; model.clearError() }
                 ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }

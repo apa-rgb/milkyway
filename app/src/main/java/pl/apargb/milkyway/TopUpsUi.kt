@@ -55,7 +55,7 @@ fun TankTopUpsDialog(state: TopUpsUiState, onClose: () -> Unit, onLoadMore: () -
                             Text("Zawartość po dolaniu: ${event.material.ifBlank { "niepodana" }}", style = MaterialTheme.typography.bodyMedium)
                             if (event.measurements.hasAnyValue()) {
                                 Text("Parametry po dolaniu", style = MaterialTheme.typography.labelSmall)
-                                MeasurementSummary(event.measurements, tank.usesFatMeasurement)
+                                MeasurementSummary(event.measurements, tank.usesFatMeasurement, tank.isOilTank)
                             }
                             if (event.oilType.isNotBlank()) Text("Rodzaj oleju: ${event.oilType}")
                             if (event.note.isNotBlank()) Text(event.note, style = MaterialTheme.typography.bodyMedium)

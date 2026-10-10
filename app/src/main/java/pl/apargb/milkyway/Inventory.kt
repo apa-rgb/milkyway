@@ -4,6 +4,8 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.UUID
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 data class Measurements(
     val brix: BigDecimal? = null,
@@ -36,8 +38,35 @@ data class TankStatus(
     val routing: TankRouting = TankRouting(),
     val material: String = "",
     val oilType: String = "",
-    val laboratoryMeasuredAt: Long? = null
+    val laboratoryMeasuredAt: Long? = null,
+    val oilBatch: OilBatch = OilBatch()
 )
+
+data class OilBatch(val producedOn: LocalDate? = null, val expiresOn: LocalDate? = null) {
+    fun validate() {
+        require(producedOn == null || expiresOn == null || expiresOn >= producedOn) {
+            "Data ważności nie może poprzedzać daty produkcji."
+        }
+    }
+}
+
+fun TankStatus.oilExpiresSoon(today: LocalDate): Boolean =
+    litres?.signum() == 1 && oilBatch.expiresOn?.let { ChronoUnit.DAYS.between(today, it) < 3 } == true
+
+// Immutable inventory events already sync with older installations. Keep batch dates
+// in an existing event field so an older client's snapshot cannot discard them.
+internal const val OIL_BATCH_MARKER = "\n[milkyway-oil-batch:v1]"
+internal fun OilBatch.auditSuffix() = OIL_BATCH_MARKER + "${producedOn ?: ""}|${expiresOn ?: ""}"
+internal fun String.oilBatchOrNull(): OilBatch? {
+    if (!contains(OIL_BATCH_MARKER)) return null
+    return runCatching {
+        val dates = substringAfterLast(OIL_BATCH_MARKER).split('|')
+        require(dates.size == 2)
+        OilBatch(dates[0].takeIf(String::isNotBlank)?.let(LocalDate::parse),
+            dates[1].takeIf(String::isNotBlank)?.let(LocalDate::parse)).also { it.validate() }
+    }.getOrNull()
+}
+internal fun Movement.displayNote() = note.substringBefore(OIL_BATCH_MARKER)
 
 val crystallizerNumbers = (1..6).toList()
 val Tank.isPowderTank: Boolean get() = group.startsWith("Proszkownia")
@@ -106,7 +135,7 @@ class InventoryRules(private val tanks: List<Tank>, private val states: Map<Stri
         }
         return InventoryChange(
             mapOf(id to old.copy(litres = litres, measurements = savedMeasurements, filledAt = filledAt, material = savedMaterial,
-                laboratoryMeasuredAt = laboratoryAt)),
+                laboratoryMeasuredAt = laboratoryAt, oilBatch = if (litres.signum() == 0) OilBatch() else old.oilBatch)),
             Movement(type = MovementType.SET_STATE, targetId = id, litres = litres,
                 previousLitres = old.litres, measurements = savedMeasurements, occurredAt = now, note = note, shift = shift,
                 routing = old.routing, material = savedMaterial, oilType = old.oilType, laboratoryMeasuredAt = laboratoryAt)
@@ -143,7 +172,7 @@ class InventoryRules(private val tanks: List<Tank>, private val states: Map<Stri
         checkVolume(targetId, before + litres)
         measurements.validate()
         val remaining = available - litres
-        val sourceAfter = if (remaining.signum() == 0) source.copy(litres = BigDecimal.ZERO, measurements = Measurements(), filledAt = null, material = "", laboratoryMeasuredAt = null)
+        val sourceAfter = if (remaining.signum() == 0) source.copy(litres = BigDecimal.ZERO, measurements = Measurements(), filledAt = null, material = "", laboratoryMeasuredAt = null, oilBatch = OilBatch())
             else source.copy(litres = remaining)
         return InventoryChange(
             mapOf(sourceId to sourceAfter, targetId to target.copy(litres = before + litres, measurements = measurements, filledAt = now, material = material.trim(), laboratoryMeasuredAt = null)),
@@ -183,15 +212,26 @@ class InventoryRules(private val tanks: List<Tank>, private val states: Map<Stri
     }
 
     fun setOilType(id: String, oilType: String, now: Long, shift: Int? = null): InventoryChange {
+        return setOilBatch(id, oilType, status(id).oilBatch, now, shift)
+    }
+
+    fun setOilBatch(id: String, oilType: String, batch: OilBatch, now: Long, shift: Int? = null): InventoryChange {
         require(tank(id).isOilTank) { "Rodzaj oleju można określić w zakładce Oleje." }
+        batch.validate()
         val type = oilType.trim()
         require(type.length <= 120) { "Rodzaj oleju może mieć do 120 znaków." }
         val old = status(id)
-        return InventoryChange(mapOf(id to old.copy(oilType = type)),
+        return InventoryChange(mapOf(id to old.copy(oilType = type, oilBatch = batch)),
             Movement(type = MovementType.OIL_TYPE, targetId = id, litres = BigDecimal.ZERO,
-                measurements = old.measurements, occurredAt = now, shift = shift, material = old.material,
-                oilType = type, note = "Poprzedni rodzaj oleju: ${old.oilType.ifBlank { "niepodany" }}",
+                previousLitres = old.litres, measurements = old.measurements, occurredAt = now, shift = shift, material = old.material,
+                oilType = type, note = "Poprzedni rodzaj oleju: ${old.oilType.ifBlank { "niepodany" }}" + batch.auditSuffix(),
                 laboratoryMeasuredAt = old.laboratoryMeasuredAt))
+    }
+
+    fun resetTank(id: String, now: Long, shift: Int? = null): InventoryChange {
+        val change = setState(id, BigDecimal.ZERO, Measurements(), now, "Wyzerowano zbiornik. Historia napełnień zachowana.", shift)
+        return change.copy(states = mapOf(id to change.states.getValue(id).copy(routing = TankRouting(), oilType = "")),
+            movement = change.movement.copy(routing = TankRouting(), oilType = ""))
     }
 
     fun updateMeasurements(id: String, measurements: Measurements, now: Long, shift: Int? = null): InventoryChange {

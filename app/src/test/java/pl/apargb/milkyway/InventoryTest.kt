@@ -191,4 +191,30 @@ class InventoryTest {
         val empty = rules(before).transfer("Silos 1", "Kryst. 1", BigDecimal("1000"), measurements, 500L, material = "Serwatka")
         assertEquals("", empty.states["Silos 1"]?.material)
     }
+
+    @Test fun oilExpiryBoundaryAndMissingOrEmptyStock() {
+        val today = java.time.LocalDate.of(2026, 10, 10)
+        fun state(days: Long, litres: BigDecimal? = BigDecimal.ONE) = TankStatus(litres = litres,
+            oilBatch = OilBatch(today.minusDays(5), today.plusDays(days)))
+        assertFalse(state(3).oilExpiresSoon(today))
+        assertTrue(state(2).oilExpiresSoon(today))
+        assertTrue(state(0).oilExpiresSoon(today))
+        assertTrue(state(-1).oilExpiresSoon(today))
+        assertFalse(state(-1, BigDecimal.ZERO).oilExpiresSoon(today))
+        assertFalse(state(1, null).oilExpiresSoon(today))
+        assertFalse(TankStatus(BigDecimal.ONE).oilExpiresSoon(today))
+        reject { OilBatch(today, today.minusDays(1)).validate() }
+    }
+
+    @Test fun resetClearsCurrentBatchAndMeasurementsAndKeepsAuditOfPreviousVolume() {
+        val date = java.time.LocalDate.of(2026, 10, 10)
+        val old = TankStatus(BigDecimal("200"), measurements, 100L, material = "Olej", oilType = "Rzepakowy",
+            oilBatch = OilBatch(date, date.plusDays(2)))
+        val change = rules(mapOf("Olej 12" to old)).resetTank("Olej 12", 200L, 3)
+        assertEquals(TankStatus(litres = BigDecimal.ZERO), change.states.getValue("Olej 12"))
+        assertEquals(BigDecimal("200"), change.movement.previousLitres)
+        assertEquals(MovementType.SET_STATE, change.movement.type)
+        assertEquals(3, change.movement.shift)
+    }
+
 }

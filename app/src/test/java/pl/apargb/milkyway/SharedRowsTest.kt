@@ -257,4 +257,28 @@ class SharedRowsTest {
             assertNull(shift.author)
         }
     }
+
+    @Test fun oilDatesSynchronizeAcrossOperatorsAndRemainAfterOrdinaryEditsUntilReset() {
+        val batch = OilBatch(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 12))
+        var snapshot = inventory(emptyMap()) { repo ->
+            repo.apply("oil-stock") { it.setState("Olej 12", BigDecimal("10"), Measurements(), 1L) }
+            repo.apply("oil-dates") { it.setOilBatch("Olej 12", "Rzepakowy", batch, 2L) }
+        }
+        snapshot = inventory(snapshot, actor2) { repo ->
+            assertEquals(batch, repo.load().states.getValue("Olej 12").oilBatch)
+            repo.apply("oil-topup") { it.receive("Olej 12", BigDecimal.ONE, "Dostawa", Measurements(), 3L) }
+            repo.apply("oil-content") { it.updateDetails("Olej 12", "Nowy opis", Measurements(), 4L) }
+        }
+        snapshot = inventory(snapshot) { repo ->
+            assertEquals(batch, repo.load().states.getValue("Olej 12").oilBatch)
+            assertEquals(3L, repo.load().states.getValue("Olej 12").filledAt)
+            repo.apply("oil-reset") { it.resetTank("Olej 12", 5L) }
+        }
+        inventory(snapshot, actor2) { repo ->
+            assertEquals(TankStatus(litres = BigDecimal.ZERO), repo.load().states.getValue("Olej 12"))
+            assertEquals(1, repo.topUps("Olej 12").totalCount)
+            assertEquals(5, repo.history("Olej 12").size)
+        }
+    }
+
 }

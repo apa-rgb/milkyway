@@ -34,12 +34,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TankDepartmentPage(department: Department, ui: InventoryUiState, onDepartment: (Department) -> Unit,
                        onTank: (Tank) -> Unit, onEdit: (Tank) -> Unit, onRouting: (Tank) -> Unit,
-                       onOilType: (Tank) -> Unit, onRetry: () -> Unit) {
+                       onOilType: (Tank) -> Unit, onRetry: () -> Unit,
+                       onReset: (Tank) -> Unit = {}, today: LocalDate = LocalDate.now()) {
     val tanks = AppContent.tanks.filter { it.department == department }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
@@ -90,7 +92,7 @@ fun TankDepartmentPage(department: Department, ui: InventoryUiState, onDepartmen
                         itemsIndexed(tanks, key = { _, tank -> tank.id }) { index, tank ->
                             TankLine(tank, ui.overview.states[tank.id] ?: TankStatus(), index, rowHeight,
                                 onOpen = { onTank(tank) }, onEdit = { onEdit(tank) }, onRouting = { onRouting(tank) },
-                                onOilType = { onOilType(tank) })
+                                onOilType = { onOilType(tank) }, onReset = { onReset(tank) }, today = today)
                         }
                     }
                 }
@@ -101,16 +103,22 @@ fun TankDepartmentPage(department: Department, ui: InventoryUiState, onDepartmen
 
 @Composable
 private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: androidx.compose.ui.unit.Dp,
-                     onOpen: () -> Unit, onEdit: () -> Unit, onRouting: () -> Unit, onOilType: () -> Unit) {
+                     onOpen: () -> Unit, onEdit: () -> Unit, onRouting: () -> Unit, onOilType: () -> Unit,
+                     onReset: () -> Unit, today: LocalDate) {
     val department = tank.department
     val capacity = tank.capacityLitres
     val fill = if (status.litres != null && capacity != null && capacity > 0) {
         status.litres.divide(BigDecimal.valueOf(capacity), 6, RoundingMode.HALF_UP).toFloat().coerceIn(0f, 1f)
     } else null
-    Column(Modifier.fillMaxWidth().heightIn(min = rowHeight).testTag("tank-row-${tank.id}")
-        .background(if (index % 2 == 0) MaterialTheme.colorScheme.surface else department.tint.copy(alpha = 0.45f))
+    val expiryWarning = tank.isOilTank && status.oilExpiresSoon(today)
+    val outline = if (expiryWarning) OilWarningColor else department.accent.copy(alpha = 0.3f)
+    val shape = RoundedCornerShape(10.dp)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 1.dp)
+        .heightIn(min = rowHeight - 2.dp).testTag("tank-row-${tank.id}")
+        .clip(shape).border(1.dp, outline, shape)
+        .background(if (expiryWarning) OilWarningBackground else if (index % 2 == 0) MaterialTheme.colorScheme.surface else department.tint.copy(alpha = 0.45f))
         .clickable(role = Role.Button, onClickLabel = "Szczegóły: ${tank.name}", onClick = onOpen)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = rowHeight - 3.dp).padding(horizontal = 12.dp, vertical = 2.dp),
+        Row(Modifier.fillMaxWidth().heightIn(min = rowHeight - 5.dp).padding(horizontal = 7.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Column(Modifier.weight(1f)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
@@ -145,10 +153,11 @@ private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: andr
                 val values = status.measurements
                 val main = if (tank.usesFatMeasurement) "Tł. ${values.fatPercent?.let(::decimalLabel) ?: "—"}%"
                     else "Brix ${values.brix?.let(::decimalLabel) ?: "—"}"
-                Text("pH ${values.ph?.let(::decimalLabel) ?: "—"} · $main · Temp ${values.temperature?.let(::decimalLabel) ?: "—"} °C",
+                Text((if (tank.isOilTank) "" else "pH ${values.ph?.let(::decimalLabel) ?: "—"} · $main · ") + "Temp ${values.temperature?.let(::decimalLabel) ?: "—"} °C",
                     Modifier.fillMaxWidth().testTag("measurements-${tank.id}"),
                     fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+
             }
             Column(Modifier.width(108.dp).testTag("quantity-${tank.id}")
                 .clickable(role = Role.Button, onClickLabel = "Edytuj ilość i zawartość: ${tank.name}", onClick = onEdit),
@@ -157,10 +166,28 @@ private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: andr
                     Modifier.fillMaxWidth(),
                     fontSize = 12.sp, lineHeight = 14.sp, textAlign = TextAlign.End,
                     fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(tank.capacityLitres?.let { capacityLabel(it).removeSuffix(" l") } ?: "Brak pojemności",
-                    fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(tank.capacityLitres?.let { capacityLabel(it).removeSuffix(" l") } ?: "Brak poj.",
+                        fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Zeruj", fontSize = 9.sp, lineHeight = 12.sp, color = department.accent,
+                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).border(1.dp, outline, RoundedCornerShape(4.dp))
+                            .clickable(role = Role.Button, onClick = onReset).padding(horizontal = 3.dp, vertical = 2.dp)
+                            .testTag("reset-tank-${tank.id}"))
+                }
             }
+        }
+        if (tank.isOilTank) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp).clickable(onClick = onOilType), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Produkcja: ${status.oilBatch.producedOn.oilDateLabel()}", fontSize = 10.sp, lineHeight = 12.sp,
+                    modifier = Modifier.weight(1f).testTag("oil-produced-${tank.id}"))
+                Text("Ważność: ${status.oilBatch.expiresOn.oilDateLabel()}", fontSize = 10.sp, lineHeight = 12.sp,
+                    fontWeight = if (expiryWarning) FontWeight.Bold else FontWeight.Normal,
+                    color = if (expiryWarning) OilWarningColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f).testTag("oil-expiry-${tank.id}"))
+            }
+            Text("Napełniono: ${status.filledAt?.let(::dateLabel) ?: "—"}", fontSize = 10.sp, lineHeight = 12.sp,
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp))
         }
         if (fill != null) {
             LinearProgressIndicator(progress = { fill }, modifier = Modifier.fillMaxWidth().height(3.dp).testTag("fill-${tank.id}"),
@@ -178,7 +205,8 @@ private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: andr
 @Composable
 fun TankDetailsDialog(tank: Tank, status: TankStatus, latest: Movement?, onClose: () -> Unit,
                       onEdit: () -> Unit, onReceive: () -> Unit, onTransfer: () -> Unit,
-                      onHistory: () -> Unit, onRouting: () -> Unit, onOilType: () -> Unit, onTopUps: () -> Unit) {
+                      onHistory: () -> Unit, onRouting: () -> Unit, onOilType: () -> Unit, onTopUps: () -> Unit,
+                      today: LocalDate = LocalDate.now()) {
     Dialog(onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(containerColor = MaterialTheme.colorScheme.background,
@@ -187,7 +215,7 @@ fun TankDetailsDialog(tank: Tank, status: TankStatus, latest: Movement?, onClose
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Wróć do działu")
                 } }) }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(12.dp)) {
-                TankStockCard(tank, status, latest, onEdit, onReceive, onTransfer, onHistory, onRouting, onOilType, onTopUps)
+                TankStockCard(tank, status, latest, onEdit, onReceive, onTransfer, onHistory, onRouting, onOilType, onTopUps, today)
             }
         }
     }

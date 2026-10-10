@@ -17,12 +17,12 @@ import androidx.compose.ui.unit.dp
 import java.math.RoundingMode
 
 enum class ProductionDestination(val title: String) {
-    MENU("Produkcja"), OTHER_MENU("Inne"), TANKS("Zbiorniki — przewidywana produkcja"), NOTES("Wpisy"),
+    MENU("Produkcja"), OTHER_MENU("Inne"), TANKS("Zbiorniki"), ESTIMATES("Przewidywana produkcja"), NOTES("Wpisy"),
     QUEUE("Kolejka produkcji"), QUEUE_BUTTER("Masłownia"), QUEUE_POWDER("Proszkownia"), QUEUE_UHT("UHT");
 
     val parent: ProductionDestination? get() = when (this) {
         MENU, OTHER_MENU -> null
-        TANKS, NOTES -> OTHER_MENU
+        TANKS, ESTIMATES, NOTES -> OTHER_MENU
         QUEUE_BUTTER, QUEUE_POWDER, QUEUE_UHT -> QUEUE
         else -> MENU
     }
@@ -36,7 +36,7 @@ fun ProductionPage(scope: Int, notesModel: WorkNotesViewModel, notes: WorkNotesS
                    queue: ProductionQueueState, queueModel: ProductionQueueViewModel) {
     key(destination) {
         when (destination) {
-            ProductionDestination.TANKS -> ProductionTanksPage(inventory, assumptions, productionModel, onEdit, onRetry)
+            ProductionDestination.TANKS, ProductionDestination.ESTIMATES -> ProductionTanksPage(inventory, assumptions, productionModel, onEdit, onRetry)
             ProductionDestination.NOTES -> WorkNotesPage(NoteKind.PRODUCTION, scope, notesModel, notes)
             ProductionDestination.MENU, ProductionDestination.OTHER_MENU, ProductionDestination.QUEUE -> ProductionMenu(destination, onNavigate)
             else -> ProductionQueuePage(when (destination) {
@@ -54,7 +54,7 @@ private fun ProductionMenu(destination: ProductionDestination, onNavigate: (Prod
     val other = destination == ProductionDestination.OTHER_MENU
     val options = when {
         queue -> listOf(ProductionDestination.QUEUE_BUTTER, ProductionDestination.QUEUE_POWDER, ProductionDestination.QUEUE_UHT)
-        other -> listOf(ProductionDestination.TANKS, ProductionDestination.NOTES)
+        other -> listOf(ProductionDestination.TANKS, ProductionDestination.ESTIMATES, ProductionDestination.NOTES)
         else -> listOf(ProductionDestination.QUEUE)
     }
     LazyColumn(Modifier.fillMaxSize().testTag(when { queue -> "production-queue-menu"; other -> "other-menu"; else -> "production-menu" }),
@@ -62,18 +62,19 @@ private fun ProductionMenu(destination: ProductionDestination, onNavigate: (Prod
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(destination.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text(when { queue -> "Wybierz dział produkcji."; other -> "Przewidywana produkcja ze zbiorników i wpisy z przebiegu pracy."; else -> "Planuj produkcję i zarządzaj kolejką zamówień." },
+                Text(when { queue -> "Wybierz dział produkcji."; other -> "Stany zbiorników, szacunki produkcji i wpisy z przebiegu pracy."; else -> "Planuj produkcję i zarządzaj kolejką zamówień." },
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         items(options, key = { it.name }) { option ->
             val tone = when (option) {
-                ProductionDestination.TANKS, ProductionDestination.QUEUE_POWDER -> Department.Powder
+                ProductionDestination.TANKS, ProductionDestination.ESTIMATES, ProductionDestination.QUEUE_POWDER -> Department.Powder
                 ProductionDestination.NOTES, ProductionDestination.QUEUE_BUTTER -> Department.Butter
                 else -> Department.Processing
             }
             val icon = when (option) {
                 ProductionDestination.TANKS -> Icons.Outlined.WaterDrop
+                ProductionDestination.ESTIMATES -> Icons.Outlined.Analytics
                 ProductionDestination.NOTES -> Icons.Outlined.NoteAlt
                 ProductionDestination.QUEUE -> Icons.Outlined.FormatListNumbered
                 ProductionDestination.QUEUE_BUTTER -> Icons.Outlined.BakeryDining
@@ -81,7 +82,8 @@ private fun ProductionMenu(destination: ProductionDestination, onNavigate: (Prod
                 else -> Icons.Outlined.LocalFireDepartment
             }
             MenuTile(if (other && option == ProductionDestination.TANKS) "Zbiorniki" else option.title, when (option) {
-                ProductionDestination.TANKS -> "Przybliżona ilość proszku i masła z parametrów zbiorników"
+                ProductionDestination.TANKS -> "Wszystkie działy — stan, pojemność i parametry"
+                ProductionDestination.ESTIMATES -> "Przybliżona ilość proszku i masła z parametrów zbiorników"
                 ProductionDestination.NOTES -> "Notatki o przebiegu produkcji na tej zmianie"
                 ProductionDestination.QUEUE -> "Masłownia, proszkownia i UHT"
                 else -> "Kolejka produkcji działu"

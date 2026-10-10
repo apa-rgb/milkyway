@@ -39,12 +39,15 @@ enum class TankEditor { STATE, RECEIVE, TRANSFER }
 @Composable
 fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
                   onEdit: () -> Unit, onReceive: () -> Unit, onTransfer: () -> Unit, onHistory: () -> Unit,
-                  onRouting: () -> Unit, onOilType: () -> Unit, onTopUps: () -> Unit) {
+                  onRouting: () -> Unit, onOilType: () -> Unit, onTopUps: () -> Unit,
+                  today: java.time.LocalDate = java.time.LocalDate.now()) {
     val department = tank.department
     val litres = status.litres
     val capacity = tank.capacityLitres?.let(BigDecimal::valueOf)
+    val expiryWarning = tank.isOilTank && status.oilExpiresSoon(today)
     Card(Modifier.fillMaxWidth().testTag("tank-${tank.id}"), shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = if (expiryWarning) OilWarningBackground else MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, if (expiryWarning) OilWarningColor else department.accent.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
         Box(Modifier.fillMaxWidth().height(4.dp).background(department.accent))
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -88,7 +91,14 @@ fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
                 else -> "niepodana"
             }, fontWeight = FontWeight.SemiBold,
                 color = if (litres?.signum() == 0) EmptyTankColor else MaterialTheme.colorScheme.onSurface)
-            MeasurementTiles(status.measurements, tank.usesFatMeasurement)
+            MeasurementTiles(status.measurements, tank.usesFatMeasurement, tank.isOilTank)
+            if (tank.isOilTank) {
+                Text("Data produkcji: ${status.oilBatch.producedOn.oilDateLabel()}", modifier = Modifier.clickable(onClick = onOilType))
+                Text("Data ważności: ${status.oilBatch.expiresOn.oilDateLabel()}", modifier = Modifier.clickable(onClick = onOilType),
+                    color = if (expiryWarning) OilWarningColor else MaterialTheme.colorScheme.onSurface)
+                if (expiryWarning) Text("Uwaga: termin ważności za mniej niż 3 dni lub już minął.", color = OilWarningColor,
+                    style = MaterialTheme.typography.bodySmall)
+            }
             status.laboratoryMeasuredAt?.let {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LaboratoryBadge(it, Modifier.testTag("detail-lab-marker-${tank.id}"))
@@ -131,11 +141,11 @@ fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
 }
 
 @Composable
-private fun MeasurementTiles(values: Measurements, usesFat: Boolean) {
+private fun MeasurementTiles(values: Measurements, usesFat: Boolean, oil: Boolean) {
     val mainMeasurement = if (usesFat) "Tłuszcz" to (values.fatPercent?.let { "${decimalLabel(it)} %" } ?: "—")
         else "Brix" to (values.brix?.let { "${decimalLabel(it)} °Bx" } ?: "—")
-    val tiles = listOf(mainMeasurement,
-        "pH" to (values.ph?.let(::decimalLabel) ?: "—"), "SH" to (values.sh?.let(::decimalLabel) ?: "—"),
+    val tiles = (if (oil) emptyList() else listOf(mainMeasurement,
+        "pH" to (values.ph?.let(::decimalLabel) ?: "—"), "SH" to (values.sh?.let(::decimalLabel) ?: "—"))) + listOf(
         "Temperatura" to (values.temperature?.let { "${decimalLabel(it)} °C" } ?: "—"))
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(2).forEach { row ->
@@ -154,7 +164,7 @@ private fun MeasurementTiles(values: Measurements, usesFat: Boolean) {
 }
 
 @Composable
-internal fun MeasurementSummary(values: Measurements, usesFat: Boolean) {
+internal fun MeasurementSummary(values: Measurements, usesFat: Boolean, oil: Boolean = false) {
     fun value(number: BigDecimal?, unit: String = "") = number?.let { decimalLabel(it) + unit } ?: "—"
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val mainMeasurement = if (usesFat) {
@@ -162,9 +172,9 @@ internal fun MeasurementSummary(values: Measurements, usesFat: Boolean) {
         } else {
             "Brix: ${value(values.brix, " °Bx")}"
         }
-        Text("$mainMeasurement · pH: ${value(values.ph)} · SH: ${value(values.sh)}",
+        if (!oil) Text("$mainMeasurement · pH: ${value(values.ph)} · SH: ${value(values.sh)}",
             style = MaterialTheme.typography.bodyMedium)
-        if (usesFat && values.brix != null) Text("Wcześniejszy pomiar Brix: ${value(values.brix, " °Bx")}",
+        if (!oil && usesFat && values.brix != null) Text("Wcześniejszy pomiar Brix: ${value(values.brix, " °Bx")}",
             style = MaterialTheme.typography.bodySmall)
         Text("Temperatura: ${value(values.temperature, " °C")}", style = MaterialTheme.typography.bodyMedium)
     }
@@ -193,6 +203,7 @@ fun TankOperationDialog(tank: Tank, mode: TankEditor, ui: InventoryUiState, shif
     val target = AppContent.tanks.find { it.id == targetId }
     val receivingTank = if (mode == TankEditor.TRANSFER) target else tank
     val usesFat = receivingTank?.usesFatMeasurement == true
+    val oil = receivingTank?.isOilTank == true
     fun clear() = model.clearError()
 
     TankFormDialog(
@@ -255,8 +266,8 @@ fun TankOperationDialog(tank: Tank, mode: TankEditor, ui: InventoryUiState, shif
                         style = MaterialTheme.typography.bodySmall)
                 }
                 if (usesFat) NumberField("Tłuszcz [%]", fatPercent, enabled) { fatPercent = it; clear() }
-                else if (receivingTank != null) NumberField("Brix [°Bx]", brix, enabled) { brix = it; clear() }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                else if (receivingTank != null && !oil) NumberField("Brix [°Bx]", brix, enabled) { brix = it; clear() }
+                if (!oil) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     NumberField("pH", ph, enabled, Modifier.weight(1f)) { ph = it; clear() }
                     NumberField("SH", sh, enabled, Modifier.weight(1f)) { sh = it; clear() }
                 }
@@ -273,8 +284,8 @@ fun TankOperationDialog(tank: Tank, mode: TankEditor, ui: InventoryUiState, shif
                 try {
                     val litres = parseCubicMetres(amount, required = mode != TankEditor.STATE)
                     val measurements = Measurements(
-                        brix = if (usesFat) null else parseDecimal(brix, "Brix"),
-                        ph = parseDecimal(ph, "pH"), sh = parseDecimal(sh, "SH"),
+                        brix = if (usesFat || oil) null else parseDecimal(brix, "Brix"),
+                        ph = if (oil) null else parseDecimal(ph, "pH"), sh = if (oil) null else parseDecimal(sh, "SH"),
                         temperature = parseDecimal(temperature, "Temperatura"),
                         fatPercent = if (usesFat) parseDecimal(fatPercent, "Tłuszcz") else null)
                     val externalSource = source
@@ -377,10 +388,11 @@ fun TankHistoryDialog(history: HistoryUiState, onClose: () -> Unit, onRetry: () 
                         Text(dateLabel(event.occurredAt) + (event.shift?.let { " · Zmiana $it" } ?: ""), style = MaterialTheme.typography.bodySmall)
                         Text("Parametry w zbiorniku docelowym", style = MaterialTheme.typography.labelSmall)
                         Text("Zawartość: ${event.material.ifBlank { "niepodana" }}")
-                        MeasurementSummary(event.measurements, AppContent.tanks.find { it.id == event.targetId }?.usesFatMeasurement == true)
+                        MeasurementSummary(event.measurements, AppContent.tanks.find { it.id == event.targetId }?.usesFatMeasurement == true, tank.isOilTank)
                         event.laboratoryMeasuredAt?.let { Text("Pomiar z laboratorium: ${dateLabel(it)}", color = EmptyTankColor,
                             style = MaterialTheme.typography.bodySmall) }
-                        if (event.note.isNotBlank()) Text(event.note)
+                        if (event.displayNote().isNotBlank()) Text(event.displayNote())
+                        event.note.oilBatchOrNull()?.let { Text("Produkcja: ${it.producedOn.oilDateLabel()} · Ważność: ${it.expiresOn.oilDateLabel()}", style = MaterialTheme.typography.bodySmall) }
                         if (event.oilType.isNotBlank()) Text("Rodzaj oleju: ${event.oilType}", style = MaterialTheme.typography.bodySmall)
                         if (event.routing != TankRouting()) Text("Oznaczenie trasy: ${routingLabel(event.routing)}", style = MaterialTheme.typography.bodySmall)
                         HorizontalDivider()
@@ -409,18 +421,26 @@ private fun routingLabel(routing: TankRouting): String =
 
 @Composable
 fun TankOilTypeDialog(tank: Tank, ui: InventoryUiState, model: InventoryViewModel, shift: Int?, onClose: () -> Unit) {
+    val batch = ui.overview.states[tank.id]?.oilBatch ?: OilBatch()
+    var producedOn by rememberSaveable { mutableStateOf(batch.producedOn?.toString() ?: "") }
+    var expiresOn by rememberSaveable { mutableStateOf(batch.expiresOn?.toString() ?: "") }
     var oilType by rememberSaveable { mutableStateOf(ui.overview.states[tank.id]?.oilType ?: "") }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     TankFormDialog(title = "Rodzaj oleju: ${tank.name}", saving = ui.saving, canSave = true,
         onClose = onClose, onSave = {
-            model.save(requestId) { it.setOilType(tank.id, oilType, System.currentTimeMillis(), shift) }
+            model.save(requestId) { it.setOilBatch(tank.id, oilType, OilBatch(
+                producedOn.takeIf(String::isNotBlank)?.let(java.time.LocalDate::parse),
+                expiresOn.takeIf(String::isNotBlank)?.let(java.time.LocalDate::parse)), System.currentTimeMillis(), shift) }
         }, content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = oilType, onValueChange = { oilType = it.take(120); model.clearError() },
                     label = { Text("Rodzaj oleju") }, placeholder = { Text("Np. rzepakowy") },
                     enabled = !ui.saving, modifier = Modifier.fillMaxWidth(), maxLines = 3,
                     shape = RoundedCornerShape(14.dp))
+                OilDateField("Data produkcji", producedOn, !ui.saving, "oil-production-date") { producedOn = it; model.clearError() }
+                OilDateField("Data ważności", expiresOn, !ui.saving, "oil-expiry-date") { expiresOn = it; model.clearError() }
+                Text("Zbiornik z olejem zmieni kolor na czerwony, gdy do daty ważności pozostaną mniej niż 3 dni. Napełnienie jest zapisywane automatycznie z godziną.", style = MaterialTheme.typography.bodySmall)
                 Text("Puste pole usuwa oznaczenie rodzaju oleju.", style = MaterialTheme.typography.bodySmall)
                 ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
