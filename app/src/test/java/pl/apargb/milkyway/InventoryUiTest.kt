@@ -260,10 +260,19 @@ class InventoryUiTest {
         Department.entries.forEach { department ->
             compose.onNodeWithTag("department-${department.name}").performClick()
             AppContent.tanks.filter { it.department == department }.forEach { tank ->
-                compose.onNodeWithTag("quantity-${tank.id}").performScrollTo().performClick()
-                compose.onNodeWithText("Edytuj: ${tank.name}").assertExists()
-                compose.onNodeWithText("Nowy stan [m³]").assertIsEnabled()
-                compose.onNodeWithText("Zawartość / materiał").assertIsEnabled()
+                if (tank.isOilTank) {
+                    compose.onNodeWithTag("main-list").performScrollToNode(hasTestTag("tank-row-${tank.id}"))
+                    compose.onNodeWithTag("tank-row-${tank.id}").performClick()
+                    compose.onNodeWithText("Olej: ${tank.name}").assertExists()
+                    compose.onNodeWithText("Stan [m³]").assertIsEnabled()
+                    compose.onNodeWithText("Rodzaj oleju").assertIsEnabled()
+                    compose.onNodeWithText("Uwagi").assertIsEnabled()
+                } else {
+                    compose.onNodeWithTag("quantity-${tank.id}").performScrollTo().performClick()
+                    compose.onNodeWithText("Edytuj: ${tank.name}").assertExists()
+                    compose.onNodeWithText("Nowy stan [m³]").assertIsEnabled()
+                    compose.onNodeWithText("Zawartość / materiał").assertIsEnabled()
+                }
                 compose.onNodeWithText("Zapisz").assertIsEnabled()
                 if (department == Department.Butter) {
                     compose.onNodeWithText("Tłuszcz [%]").assertExists()
@@ -395,31 +404,35 @@ class InventoryUiTest {
         Department.entries.forEach { compose.onNodeWithTag("department-${it.name}").assertIsDisplayed() }
         screenshot("compact-small-phone")
         compose.onNodeWithTag("department-Oils").performClick()
+        compose.onNodeWithTag("main-list").performScrollToNode(hasTestTag("tank-row-Olej 17"))
         compose.onNodeWithTag("tank-row-Olej 17").assertIsDisplayed()
-        compose.onNodeWithTag("oil-type-Olej 17").performClick()
-        compose.onNodeWithText("Rodzaj oleju").performTextInput("Rzepakowy")
-        compose.onNodeWithText("Zapisz").performClick()
-        compose.waitUntil(timeoutMillis = 10000) {
-            compose.onAllNodesWithText("Rodzaj: Rzepakowy").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithTag("quantity-Olej 17").performClick()
-        compose.onNodeWithText("Nowy stan [m³]").performTextInput("0")
-        compose.onNodeWithText("Zapisz").performClick()
-        compose.waitUntil(timeoutMillis = 10000) {
-            compose.onAllNodes(hasTestTag("quantity-Olej 17") and hasText("0")).fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithTag("quantity-Olej 17").performClick()
-        compose.onNodeWithText("Nowy stan [m³]").assert(hasText("0", substring = true))
-        compose.onNodeWithText("Anuluj").performClick()
-        compose.onNodeWithTag("tank-heading-Olej 17").assert(hasText("pusty"))
-        compose.onNodeWithTag("oil-type-Olej 17").assert(hasText("Rodzaj: Rzepakowy"))
-        screenshot("oleje-pusty")
-        compose.onNodeWithTag("tank-heading-Olej 17").performClick()
-        compose.onNodeWithText("Edytuj").assertDoesNotExist()
-        compose.onNodeWithText("Opis zbiornika: Olej").assertExists()
+        compose.onNodeWithTag("tank-row-Olej 17").performClick()
         compose.onNodeWithText("Pojemność: 60 000 l").assertExists()
-        compose.onNodeWithText("Rodzaj oleju: Rzepakowy").assertExists()
-        compose.onNodeWithContentDescription("Wróć do działu").performClick()
+        compose.onNodeWithText("Brix [°Bx]").assertDoesNotExist()
+        compose.onNodeWithText("pH").assertDoesNotExist()
+        compose.onNodeWithText("Rodzaj oleju").performTextClearance()
+        compose.onNodeWithText("Rodzaj oleju").performTextInput("Rzepakowy")
+        compose.onNodeWithText("Stan [m³]").performTextClearance()
+        compose.onNodeWithText("Stan [m³]").performTextInput("0,5")
+        compose.onNodeWithText("Temperatura [°C]").performScrollTo().performTextClearance()
+        compose.onNodeWithText("Temperatura [°C]").performScrollTo().performTextInput("24")
+        compose.onNodeWithText("Uwagi").performScrollTo().performTextClearance()
+        compose.onNodeWithText("Uwagi").performScrollTo().performTextInput("Partia do sprawdzenia")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Uwagi").assert(hasText("Partia do sprawdzenia", substring = true))
+        screenshot("oleje-wspolny-formularz")
+        compose.onNodeWithText("Zapisz").performClick()
+        compose.waitUntil(timeoutMillis = 10000) {
+            compose.onAllNodesWithText("Rodzaj oleju: Rzepakowy").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("quantity-Olej 17", useUnmergedTree = true).assert(hasText("500 / 60 000 l"))
+        compose.onNodeWithTag("oil-notes-Olej 17", useUnmergedTree = true).assertTextEquals("Uwagi: Partia do sprawdzenia")
+        compose.onNodeWithTag("measurements-Olej 17", useUnmergedTree = true).assertTextEquals("Temp 24 °C")
+        compose.onNodeWithTag("tank-row-Olej 17").performClick()
+        compose.onNodeWithText("Stan [m³]").assert(hasText("0,5", substring = true))
+        compose.onNodeWithText("Uwagi").performScrollTo().assert(hasText("Partia do sprawdzenia", substring = true))
+        compose.onNodeWithText("Anuluj").performClick()
+        screenshot("oleje-jeden-kafelek")
         compose.onNodeWithTag("department-Powder").performClick()
         compose.onNodeWithTag("tank-row-Silos 1").assertIsDisplayed()
     }
@@ -453,26 +466,21 @@ class InventoryUiTest {
             .assertTextEquals("Ważność: ${today.oilDateLabel()}").assertTextColor(androidx.compose.ui.graphics.Color.White)
         compose.onNodeWithTag("measurements-Olej 14", useUnmergedTree = true).assertTextColor(OilUrgentSecondary)
         screenshot("oleje-daty-waznosc")
-        compose.onNodeWithTag("tank-heading-Olej 14").performClick()
-        compose.onNodeWithTag("detail-oil-expiry-Olej 14", useUnmergedTree = true).performScrollTo()
-            .assertTextEquals("Data ważności: ${today.oilDateLabel()}").assertTextColor(androidx.compose.ui.graphics.Color.White)
-        screenshot("oleje-bordowy-szczegoly")
-        compose.onNodeWithContentDescription("Wróć do działu").performClick()
-        compose.onNodeWithTag("oil-type-Olej 12").performClick()
-        compose.onNodeWithTag("oil-production-date").performClick()
-        compose.onNodeWithTag("oil-production-date-calendar").assertExists()
+        compose.onNodeWithTag("tank-row-Olej 12").performClick()
+        compose.onNodeWithTag("oil-expiry-date").performScrollTo().performClick()
+        compose.onNodeWithTag("oil-expiry-date-calendar").assertExists()
         compose.onNodeWithText("Wybierz").performClick()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithTag("oil-production-date").assert(hasText(today.minusDays(2).oilDateLabel(), substring = true))
+        compose.onNodeWithTag("oil-expiry-date").assert(hasText(today.plusDays(2).oilDateLabel(), substring = true))
         compose.onNodeWithText("Zapisz").performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithTag("tank-row-Olej 12").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("reset-tank-Olej 12").performClick()
         compose.onNodeWithText("Anuluj").performClick()
-        compose.onNodeWithTag("quantity-Olej 12").assert(hasText("1 100"))
+        compose.onNodeWithTag("quantity-Olej 12", useUnmergedTree = true).assert(hasText("1 100", substring = true))
         compose.onNodeWithTag("reset-tank-Olej 12").performClick()
         compose.onNodeWithTag("confirm-reset-tank").performClick()
-        compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodes(hasTestTag("quantity-Olej 12") and hasText("0")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("tank-heading-Olej 12").assert(hasText("pusty"))
+        compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodes(hasTestTag("quantity-Olej 12") and hasText("0 / 10 000 l"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasText("pusty") and hasAnyAncestor(hasTestTag("tank-heading-Olej 12")), useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("oil-expiry-Olej 12", useUnmergedTree = true).assertTextEquals("Ważność: —")
         InventoryRepository(model.getApplication()).let { repo ->
             try {
@@ -485,6 +493,6 @@ class InventoryUiTest {
         compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").performClick()
         compose.onNodeWithTag("department-Oils").assertIsSelected()
-        compose.onNodeWithTag("tank-heading-Olej 12").assert(hasText("pusty"))
+        compose.onNode(hasText("pusty") and hasAnyAncestor(hasTestTag("tank-heading-Olej 12")), useUnmergedTree = true).assertExists()
     }
 }

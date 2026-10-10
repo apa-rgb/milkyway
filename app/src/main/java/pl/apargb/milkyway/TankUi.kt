@@ -435,27 +435,41 @@ private fun routingLabel(routing: TankRouting): String =
 
 @Composable
 fun TankOilTypeDialog(tank: Tank, ui: InventoryUiState, model: InventoryViewModel, shift: Int?, onClose: () -> Unit) {
-    val batch = ui.overview.states[tank.id]?.oilBatch ?: OilBatch()
-    var producedOn by rememberSaveable { mutableStateOf(batch.producedOn?.toString() ?: "") }
+    val status = ui.overview.states[tank.id] ?: TankStatus()
+    val batch = status.oilBatch
+    var amount by rememberSaveable { mutableStateOf(status.litres.cubicMetresInputText()) }
     var expiresOn by rememberSaveable { mutableStateOf(batch.expiresOn?.toString() ?: "") }
-    var oilType by rememberSaveable { mutableStateOf(ui.overview.states[tank.id]?.oilType ?: "") }
+    var oilType by rememberSaveable { mutableStateOf(status.oilType) }
+    var temperature by rememberSaveable { mutableStateOf(status.measurements.temperature.inputText()) }
+    var notes by rememberSaveable { mutableStateOf(batch.notes) }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
-    TankFormDialog(title = "Rodzaj oleju: ${tank.name}", saving = ui.saving, canSave = true,
+    TankFormDialog(title = "Olej: ${tank.name}", saving = ui.saving, canSave = true,
         onClose = onClose, onSave = {
-            model.save(requestId) { it.setOilBatch(tank.id, oilType, OilBatch(
-                producedOn.takeIf(String::isNotBlank)?.let(java.time.LocalDate::parse),
-                expiresOn.takeIf(String::isNotBlank)?.let(java.time.LocalDate::parse)), System.currentTimeMillis(), shift) }
+            try {
+                val litres = parseCubicMetres(amount)
+                val measuredTemperature = parseDecimal(temperature, "Temperatura")
+                val savedBatch = batch.copy(expiresOn = expiresOn.takeIf(String::isNotBlank)?.let(java.time.LocalDate::parse), notes = notes)
+                model.save(requestId) { it.setOilDetails(tank.id, litres, oilType, savedBatch,
+                    measuredTemperature, System.currentTimeMillis(), shift) }
+            } catch (error: IllegalArgumentException) {
+                model.showError(error.message ?: "Sprawdź wpisane dane.")
+            }
         }, content = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Pojemność: ${capacityLabel(tank.capacityLitres)}", fontWeight = FontWeight.Bold)
+                NumberField("Stan [m³]", amount, !ui.saving, supportingText = volumeInputHint(amount)) { amount = it; model.clearError() }
                 OutlinedTextField(value = oilType, onValueChange = { oilType = it.take(120); model.clearError() },
                     label = { Text("Rodzaj oleju") }, placeholder = { Text("Np. rzepakowy") },
-                    enabled = !ui.saving, modifier = Modifier.fillMaxWidth(), maxLines = 3,
+                    enabled = !ui.saving, modifier = Modifier.fillMaxWidth(), maxLines = 2,
                     shape = RoundedCornerShape(14.dp))
-                OilDateField("Data produkcji", producedOn, !ui.saving, "oil-production-date") { producedOn = it; model.clearError() }
                 OilDateField("Data ważności", expiresOn, !ui.saving, "oil-expiry-date") { expiresOn = it; model.clearError() }
-                Text("Zbiornik z olejem zmieni kolor na czerwony, gdy do daty ważności pozostaną mniej niż 3 dni. Napełnienie jest zapisywane automatycznie z godziną.", style = MaterialTheme.typography.bodySmall)
-                Text("Puste pole usuwa oznaczenie rodzaju oleju.", style = MaterialTheme.typography.bodySmall)
+                NumberField("Temperatura [°C]", temperature, !ui.saving, signed = true) { temperature = it; model.clearError() }
+                OutlinedTextField(value = notes, onValueChange = { notes = it.take(1000); model.clearError() },
+                    label = { Text("Uwagi") }, modifier = Modifier.fillMaxWidth(), enabled = !ui.saving,
+                    minLines = 2, maxLines = 4, shape = RoundedCornerShape(14.dp))
+                Text("Puste pole ilości zachowuje stan. Wpisanie 0 opróżnia zbiornik i usuwa datę ważności. Historia pozostaje.",
+                    style = MaterialTheme.typography.bodySmall)
                 ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         })

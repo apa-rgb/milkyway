@@ -119,7 +119,8 @@ internal class InventoryRepository(context: Context, private val helper: Invento
                     }
                     db.replaceOrThrow("tank_states", null, values)
                 }
-                val event = change.movement.copy(id = requestId)
+                (listOf(change.movement) + change.additionalMovements).forEachIndexed { index, movement ->
+                val event = movement.copy(id = if (index == 0) requestId else "$requestId:$index")
                 val values = event.measurements.values().apply {
                     put("id", event.id)
                     put("type", event.type.name)
@@ -138,6 +139,7 @@ internal class InventoryRepository(context: Context, private val helper: Invento
                     put("laboratory_at", event.laboratoryMeasuredAt)
                 }
                 db.insertOrThrow("movements", null, values)
+                }
             }
             db.setTransactionSuccessful()
         } finally {

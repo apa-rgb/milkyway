@@ -74,7 +74,7 @@ fun TankDepartmentPage(department: Department, ui: InventoryUiState, onDepartmen
                 fontWeight = FontWeight.Bold, color = department.accent)
             Text("${tanks.size} zbiorników", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = department.accent)
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp)) {
+        if (department != Department.Oils) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp)) {
             Text("Zbiornik · opis / zawartość", Modifier.weight(1f), fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             Text("Stan / poj. [l]", Modifier.width(108.dp), fontSize = 10.sp, textAlign = TextAlign.End,
@@ -107,6 +107,10 @@ fun TankDepartmentPage(department: Department, ui: InventoryUiState, onDepartmen
 private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: androidx.compose.ui.unit.Dp,
                      onOpen: () -> Unit, onEdit: () -> Unit, onRouting: () -> Unit, onOilType: () -> Unit,
                      onReset: () -> Unit, today: LocalDate, now: java.time.Instant) {
+    if (tank.isOilTank) {
+        OilTankButton(tank, status, index, onOilType, onReset, today, now)
+        return
+    }
     val department = tank.department
     val capacity = tank.capacityLitres
     val fill = if (status.litres != null && capacity != null && capacity > 0) {
@@ -138,9 +142,7 @@ private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: andr
                         if (status.litres?.signum() == 0) Text("pusty", fontSize = 10.sp, lineHeight = 12.sp,
                             fontWeight = FontWeight.SemiBold, color = EmptyTankColor)
                     }
-                    Text(if (tank.isOilTank) "Rodzaj: ${status.oilType.ifBlank { "niepodany" }}" else status.material.ifBlank { tank.description },
-                        modifier = Modifier.weight(1f).then(if (tank.isOilTank) Modifier.testTag("oil-type-${tank.id}")
-                            .clickable(role = Role.Button, onClickLabel = "Edytuj rodzaj oleju: ${tank.name}", onClick = onOilType) else Modifier),
+                    Text(status.material.ifBlank { tank.description }, modifier = Modifier.weight(1f),
                         fontSize = 10.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.Medium, color = secondaryColor)
                     if (tank.isPowderTank) {
@@ -183,20 +185,6 @@ private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: andr
                 }
             }
         }
-        if (tank.isOilTank) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp).clickable(onClick = onOilType), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Produkcja: ${status.oilBatch.producedOn.oilDateLabel()}", fontSize = 10.sp, lineHeight = 12.sp,
-                    fontWeight = FontWeight.Medium, color = secondaryColor,
-                    modifier = Modifier.weight(1f).testTag("oil-produced-${tank.id}"))
-                Text("Ważność: ${status.oilBatch.expiresOn.oilDateLabel()}", fontSize = 10.sp, lineHeight = 12.sp,
-                    fontWeight = if (expiryWarning) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (urgent) Color.White else if (expiryWarning) OilWarningColor else secondaryColor,
-                    modifier = Modifier.weight(1f).testTag("oil-expiry-${tank.id}"))
-            }
-            Text("Napełniono: ${status.filledAt?.let(::dateLabel) ?: "—"}", fontSize = 10.sp, lineHeight = 12.sp,
-                fontWeight = FontWeight.Medium, color = secondaryColor,
-                modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp))
-        }
         if (fill != null) {
             LinearProgressIndicator(progress = { fill }, modifier = Modifier.fillMaxWidth().height(3.dp).testTag("fill-${tank.id}"),
                 color = if (urgent) Color.White.copy(alpha = .3f) else department.accent.copy(alpha = 0.22f),
@@ -207,6 +195,55 @@ private fun TankLine(tank: Tank, status: TankStatus, index: Int, rowHeight: andr
                 .background(department.accent.copy(alpha = 0.04f))
                 .semantics { contentDescription = if (capacity == null) "Napełnienie nieznane: brak pojemności" else "Napełnienie nieustalone" })
         }
+    }
+}
+
+@Composable
+private fun OilTankButton(tank: Tank, status: TankStatus, index: Int, onClick: () -> Unit, onReset: () -> Unit,
+                          today: LocalDate, now: java.time.Instant) {
+    val urgent = status.oilExpiresWithinDay(now, java.time.ZoneId.systemDefault())
+    val warning = status.oilExpiresSoon(today)
+    val foreground = if (urgent) Color.White else MaterialTheme.colorScheme.onSurface
+    val secondary = if (urgent) OilUrgentSecondary else foreground
+    val shape = RoundedCornerShape(12.dp)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp)
+        .testTag("tank-row-${tank.id}").clip(shape)
+        .background(if (urgent) OilUrgentBackground else if (warning) OilWarningBackground
+            else if (index % 2 == 0) MaterialTheme.colorScheme.surface else tank.department.tint.copy(alpha = .45f))
+        .border(1.dp, if (urgent) OilUrgentOutline else if (warning) OilWarningColor
+            else tank.department.accent.copy(alpha = .35f), shape)
+        .clickable(role = Role.Button, onClickLabel = "Edytuj ${tank.name}", onClick = onClick)
+        .padding(horizontal = 10.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).testTag("tank-heading-${tank.id}"), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(tank.name, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.ExtraBold,
+                    color = if (urgent) Color.White else tank.department.accent)
+                if (status.litres?.signum() == 0) Text("pusty", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = EmptyTankColor)
+            }
+            Text("${status.litres?.let(::decimalLabel) ?: "—"} / ${capacityLabel(tank.capacityLitres)}",
+                Modifier.testTag("quantity-${tank.id}"), fontSize = 11.sp, lineHeight = 16.sp,
+                fontWeight = FontWeight.Bold, color = foreground)
+            Text("Zeruj", Modifier.padding(start = 6.dp).clip(RoundedCornerShape(5.dp))
+                .border(1.dp, if (urgent) OilUrgentSecondary else tank.department.accent.copy(alpha = .5f), RoundedCornerShape(5.dp))
+                .clickable(role = Role.Button, onClickLabel = "Wyzeruj ${tank.name}", onClick = onReset)
+                .padding(horizontal = 5.dp, vertical = 4.dp).testTag("reset-tank-${tank.id}"),
+                fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold,
+                color = if (urgent) Color.White else tank.department.accent)
+        }
+        Text("Rodzaj oleju: ${status.oilType.ifBlank { "—" }}", Modifier.testTag("oil-type-${tank.id}"),
+            fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, color = secondary,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Ważność: ${status.oilBatch.expiresOn.oilDateLabel()}", Modifier.weight(1f).testTag("oil-expiry-${tank.id}"),
+                fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold,
+                color = if (urgent) Color.White else if (warning) OilWarningColor else secondary)
+            Text("Temp ${status.measurements.temperature?.let(::decimalLabel) ?: "—"} °C",
+                Modifier.testTag("measurements-${tank.id}"), fontSize = 10.sp, lineHeight = 14.sp,
+                fontWeight = FontWeight.SemiBold, color = secondary)
+        }
+        Text("Uwagi: ${status.oilBatch.notes.ifBlank { "—" }}", Modifier.testTag("oil-notes-${tank.id}"),
+            fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, color = secondary,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

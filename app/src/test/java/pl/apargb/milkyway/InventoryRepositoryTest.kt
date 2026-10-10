@@ -441,4 +441,53 @@ class InventoryRepositoryTest {
         repository.apply { it.receive("Olej 12", BigDecimal.ONE, "Dostawa", Measurements(), 4L) }
         assertEquals(OilBatch(), repository.load().states.getValue("Olej 12").oilBatch)
     }
+    @Test fun unifiedOilFormSavesAllFieldsAtomicallyAndNotesSurviveReopenAndTopUps() {
+        val batch = OilBatch(expiresOn = java.time.LocalDate.of(2026, 10, 12), notes = "Partia A\nSprawdzić | zapach [milkyway-oil-batch:v1]")
+        repository.apply("oil-form") { it.setOilDetails("Olej 12", BigDecimal("1500"), " Rzepakowy ", batch, BigDecimal("22"), 100L, 2) }
+        repository.apply("oil-form") { error("Duplicate request must not run") }
+        assertEquals(2, repository.history("Olej 12").size)
+        assertEquals(100L, repository.load().states.getValue("Olej 12").filledAt)
+        repository.close()
+        database = InventoryDatabase(context)
+        repository = InventoryRepository(context, database)
+        val saved = repository.load().states.getValue("Olej 12")
+        assertEquals(BigDecimal("1500"), saved.litres)
+        assertEquals("Rzepakowy", saved.oilType)
+        assertEquals(BigDecimal("22"), saved.measurements.temperature)
+        assertEquals(batch, saved.oilBatch)
+        val snapshot = SharedRows.capture(database, SharedDomain.INVENTORY, emptyMap(), mapOf("uid" to "operator-01"), 150L)
+        SharedDomain.INVENTORY.database(context).useDatabase { restored ->
+            SharedRows.restore(restored, SharedDomain.INVENTORY, snapshot)
+            assertEquals(saved, InventoryRepository(context, restored as InventoryDatabase).load().states.getValue("Olej 12"))
+        }
+        val note = repository.history("Olej 12").first().note
+        assertEquals("|2026-10-12", note.substringAfterLast(OIL_BATCH_MARKER))
+        assertFalse(repository.history("Olej 12").first().displayNote().contains("milkyway-oil-notes"))
+        repository.apply { it.receive("Olej 12", BigDecimal("100"), "Dostawa", Measurements(temperature = BigDecimal("23")), 200L) }
+        assertEquals(batch, repository.load().states.getValue("Olej 12").oilBatch)
+        val before = repository.load()
+        val count = repository.history("Olej 12").size
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.apply { it.setOilDetails("Olej 12", BigDecimal("2000"), "Inny", batch.copy(expiresOn = java.time.LocalDate.of(2020, 1, 1), producedOn = java.time.LocalDate.of(2026, 1, 1)), BigDecimal("30"), 300L) }
+        }
+        assertEquals(before, repository.load())
+        assertEquals(count, repository.history("Olej 12").size)
+        repository.apply { it.resetTank("Olej 12", 400L) }
+        assertEquals(OilBatch(), repository.load().states.getValue("Olej 12").oilBatch)
+        assertEquals(1, repository.topUps("Olej 12").totalCount)
+    }
+
+    @Test fun unifiedOilFormRollsBackQuantityWhenBatchAuditCannotBeWritten() {
+        repository.apply { it.setState("Olej 12", BigDecimal("500"), Measurements(temperature = BigDecimal("20")), 50L) }
+        val before = repository.load()
+        database.writableDatabase.execSQL("""CREATE TRIGGER reject_oil_metadata BEFORE INSERT ON movements
+            WHEN NEW.type = 'OIL_TYPE' BEGIN SELECT RAISE(ABORT, 'test failure'); END""")
+        assertThrows(SQLiteException::class.java) {
+            repository.apply("oil-rollback") { it.setOilDetails("Olej 12", BigDecimal("1500"), "Rzepakowy",
+                OilBatch(notes = "Partia A"), BigDecimal("22"), 100L) }
+        }
+        assertEquals(before, repository.load())
+        assertEquals(1, repository.history("Olej 12").size)
+    }
+
 }

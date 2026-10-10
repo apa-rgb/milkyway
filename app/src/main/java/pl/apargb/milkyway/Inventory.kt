@@ -42,8 +42,9 @@ data class TankStatus(
     val oilBatch: OilBatch = OilBatch()
 )
 
-data class OilBatch(val producedOn: LocalDate? = null, val expiresOn: LocalDate? = null) {
+data class OilBatch(val producedOn: LocalDate? = null, val expiresOn: LocalDate? = null, val notes: String = "") {
     fun validate() {
+        require(notes.length <= 1000) { "Uwagi mogą mieć do 1000 znaków." }
         require(producedOn == null || expiresOn == null || expiresOn >= producedOn) {
             "Data ważności nie może poprzedzać daty produkcji."
         }
@@ -64,17 +65,25 @@ internal fun TankStatus.oilExpiresWithinDay(now: java.time.Instant, zone: java.t
 // Immutable inventory events already sync with older installations. Keep batch dates
 // in an existing event field so an older client's snapshot cannot discard them.
 internal const val OIL_BATCH_MARKER = "\n[milkyway-oil-batch:v1]"
-internal fun OilBatch.auditSuffix() = OIL_BATCH_MARKER + "${producedOn ?: ""}|${expiresOn ?: ""}"
+internal const val OIL_NOTES_MARKER = "\n[milkyway-oil-notes:v1]"
+internal fun OilBatch.auditSuffix(): String {
+    val encoded = java.util.Base64.getEncoder().encodeToString(notes.toByteArray(Charsets.UTF_8))
+    // Keep the dates marker last so existing clients can still read its two fields.
+    return OIL_NOTES_MARKER + encoded + OIL_BATCH_MARKER + "${producedOn ?: ""}|${expiresOn ?: ""}"
+}
 internal fun String.oilBatchOrNull(): OilBatch? {
     if (!contains(OIL_BATCH_MARKER)) return null
     return runCatching {
         val dates = substringAfterLast(OIL_BATCH_MARKER).split('|')
         require(dates.size == 2)
         OilBatch(dates[0].takeIf(String::isNotBlank)?.let(LocalDate::parse),
-            dates[1].takeIf(String::isNotBlank)?.let(LocalDate::parse)).also { it.validate() }
+            dates[1].takeIf(String::isNotBlank)?.let(LocalDate::parse),
+            if (contains(OIL_NOTES_MARKER)) String(java.util.Base64.getDecoder().decode(
+                substringAfterLast(OIL_NOTES_MARKER).substringBefore(OIL_BATCH_MARKER)), Charsets.UTF_8) else "")
+            .also { it.validate() }
     }.getOrNull()
 }
-internal fun Movement.displayNote() = note.substringBefore(OIL_BATCH_MARKER)
+internal fun Movement.displayNote() = note.substringBefore(OIL_NOTES_MARKER).substringBefore(OIL_BATCH_MARKER)
 
 val crystallizerNumbers = (1..6).toList()
 val Tank.isPowderTank: Boolean get() = group.startsWith("Proszkownia")
@@ -108,7 +117,8 @@ data class Movement(
     val laboratoryMeasuredAt: Long? = null
 )
 
-data class InventoryChange(val states: Map<String, TankStatus>, val movement: Movement)
+data class InventoryChange(val states: Map<String, TankStatus>, val movement: Movement,
+                           val additionalMovements: List<Movement> = emptyList())
 
 /** Pure rules: validate a whole operation before producing either of its state changes. */
 class InventoryRules(private val tanks: List<Tank>, private val states: Map<String, TankStatus>) {
@@ -234,6 +244,22 @@ class InventoryRules(private val tanks: List<Tank>, private val states: Map<Stri
                 previousLitres = old.litres, measurements = old.measurements, occurredAt = now, shift = shift, material = old.material,
                 oilType = type, note = "Poprzedni rodzaj oleju: ${old.oilType.ifBlank { "niepodany" }}" + batch.auditSuffix(),
                 laboratoryMeasuredAt = old.laboratoryMeasuredAt))
+    }
+
+    /** One form saves quantity, measurements and batch metadata in a single transaction. */
+    fun setOilDetails(id: String, litres: BigDecimal?, oilType: String, batch: OilBatch,
+                      temperature: BigDecimal?, now: Long, shift: Int? = null): InventoryChange {
+        require(tank(id).isOilTank) { "Wybierz zbiornik z zakładki Oleje." }
+        val old = status(id)
+        val measurements = old.measurements.copy(temperature = temperature)
+        val quantity = if (litres == null) updateDetails(id, old.material, measurements, now, shift = shift)
+            else setState(id, litres, measurements, now, shift = shift, material = old.material)
+        val afterQuantity = quantity.states.getValue(id)
+        // Emptying removes the previous batch dates; remarks can also describe an empty tank.
+        val savedBatch = if (afterQuantity.litres?.signum() == 0) OilBatch(notes = batch.notes.trim())
+            else batch.copy(notes = batch.notes.trim())
+        val metadata = InventoryRules(tanks, states + quantity.states).setOilBatch(id, oilType, savedBatch, now, shift)
+        return quantity.copy(states = metadata.states, additionalMovements = listOf(metadata.movement))
     }
 
     fun resetTank(id: String, now: Long, shift: Int? = null): InventoryChange {
