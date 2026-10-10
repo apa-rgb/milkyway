@@ -166,7 +166,7 @@ class SharedRowsTest {
                 repo.save(kind.name, ProductionLine.BUTTER, day, "Partia ${kind.title}",
                     withButterKind("Pełny opis klienta", kind), 1L, BigDecimal("1000"), pendingOrder = true)
                 repo.addProductNote("note-${kind.name}", repo.load().single { it.id == kind.name }, ProductNoteStage.ORDER,
-                    withImportantText("Pilna dostawa przed południem", true), 2L)
+                    withImportantText("Pilna dostawa przed południem", true), 2L, author = "Łukasz")
             }
         }
         snapshot = apply(snapshot, actor2) { repo ->
@@ -189,6 +189,7 @@ class SharedRowsTest {
             assertEquals(2, state.productNotes.size)
             state.productNotes.forEach { note ->
                 assertEquals("Pilna dostawa przed południem", note.visibleText)
+                assertEquals("Łukasz", note.author)
                 assertEquals(2L, note.createdAt); assertEquals(ProductNoteStage.ORDER, note.stage)
                 assertEquals(note.entryId == "BUTTER", note.important)
             }
@@ -198,6 +199,7 @@ class SharedRowsTest {
         apply(snapshot, actor2) { repo ->
             assertEquals(ButterProductKind.MIX, repo.load().single { it.id == "MIX" }.butterKind)
             assertTrue(repo.snapshot().productNotes.all { it.important })
+            assertTrue(repo.snapshot().productNotes.all { it.author == "Łukasz" })
             assertEquals(2, repo.snapshot().completions.size)
         }
     }
@@ -210,22 +212,24 @@ class SharedRowsTest {
                 SharedRows.capture(helper, SharedDomain.NOTES, previous, actor, 3000L)
             }
         var snapshot = apply(emptyMap(), actor1) { repo ->
-            repo.save("board", 0, NoteKind.REMINDER, "Awaria", withImportantText("Sprawdzić instalację", true), 1L)
+            repo.save("board", 0, NoteKind.REMINDER, "Awaria", withImportantText("Sprawdzić instalację", true), 1L, author = "Anna")
             repo.save("shift", 1, NoteKind.CURRENT_NOTES, "Pilne", withImportantText("", true), 2L)
         }
         snapshot = apply(snapshot, actor2) { repo ->
             val board = repo.load().single { it.id == "board" }
             assertTrue(board.important); assertEquals("Sprawdzić instalację", board.visibleBody)
             repo.setCompleted(board, true, 3L)
-            repo.save(board.id, board.scope, board.kind, board.title, withImportantText(board.visibleBody, false), 4L)
+            repo.save(board.id, board.scope, board.kind, board.title, withImportantText(board.visibleBody, false), 4L, author = "Piotr")
         }
         apply(snapshot, actor1) { repo ->
             val board = repo.load().single { it.id == "board" }
             assertFalse(board.important); assertTrue(board.completed)
             assertEquals(1L, board.createdAt); assertEquals(0, board.scope)
-            assertEquals("Sprawdzić instalację", board.body)
+            assertEquals("Sprawdzić instalację", board.visibleBody)
+            assertEquals("Anna", board.author)
             val shift = repo.load().single { it.id == "shift" }
             assertTrue(shift.important); assertEquals("", shift.visibleBody); assertEquals(1, shift.scope)
+            assertNull(shift.author)
         }
     }
 }

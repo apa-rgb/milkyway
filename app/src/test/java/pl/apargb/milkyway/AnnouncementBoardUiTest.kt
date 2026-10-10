@@ -33,7 +33,7 @@ class AnnouncementBoardUiTest {
         val repo = WorkNotesRepository(model.getApplication())
         try {
             val created = today.minusDays(1).atTime(10, 15).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            repo.save("yesterday", 0, NoteKind.REMINDER, "Wczorajsze ogłoszenie", "Oryginalna treść", created)
+            repo.save("yesterday", 0, NoteKind.REMINDER, "Wczorajsze ogłoszenie", "Oryginalna treść", created, author = "Anna")
             repo.save("yesterday", 0, NoteKind.REMINDER, "Wczorajsze ogłoszenie", "Poprawiona treść", System.currentTimeMillis())
             repo.save("shift", 1, NoteKind.REMINDER, "Przypomnienie zmiany", "Oddzielny wpis", System.currentTimeMillis())
         } finally { repo.close() }
@@ -78,6 +78,10 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithText("Wybierz").performClick()
         compose.onNodeWithTag("announcements-date").assert(hasText(queueDateLabel(yesterday)))
         compose.onNodeWithText("Wczorajsze ogłoszenie").assertExists()
+        compose.onNodeWithTag("announcement-author-yesterday", true).assertTextEquals("Autor: Anna")
+        compose.onNodeWithTag("announcement-yesterday").performClick()
+        compose.onNodeWithTag("work-note-editor-author", true).assertTextEquals("Autor: Anna")
+        compose.onNodeWithText("Anuluj").performClick()
         compose.onNodeWithTag("announcement-created-yesterday", true).assertTextEquals("Dodano: ${queueDateLabel(yesterday)} 10:15")
         compose.onNodeWithTag("announcements-today").performClick()
         compose.onNodeWithText("Zaktualizowane ogłoszenie").assertExists()

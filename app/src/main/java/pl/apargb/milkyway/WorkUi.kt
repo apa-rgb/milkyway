@@ -148,6 +148,7 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
                                 Text(if (note.completed) "Wykonane" else "Dotknij, aby poprawić",
                                     style = MaterialTheme.typography.labelSmall, color = tone.accent)
                             }
+                            NoteAuthorLabel(note.author, Modifier.testTag("note-author-${note.id}"))
                         }
                     }
                 }
@@ -193,6 +194,7 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
             Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(if (scope == 0) pageTitle else "$pageTitle · Zmiana $scope", color = kind.tone().accent)
+                NoteAuthorLabel(if (initial == null) currentNoteAuthor() else initial.author, Modifier.testTag("work-note-editor-author"))
                 OutlinedTextField(value = title, onValueChange = { title = it.take(120); model.clearError() },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
                     label = { Text("Tytuł") }, enabled = !ui.saving, singleLine = true,

@@ -39,7 +39,7 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
         buildList { while (cursor.moveToNext()) add(cursor.note()) }
     }
 
-    @Synchronized fun save(id: String, scope: Int, kind: NoteKind, title: String, body: String, now: Long): List<WorkNote> {
+    @Synchronized fun save(id: String, scope: Int, kind: NoteKind, title: String, body: String, now: Long, author: String? = null): List<WorkNote> {
         require(id.isNotBlank()) { "Brak identyfikatora wpisu." }
         require(scope in 0..3) { "Wybierz zmianę 1, 2 lub 3." }
         require(title.trim().isNotEmpty()) { "Podaj tytuł wpisu." }
@@ -52,7 +52,7 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
             require(old == null || (old.scope == scope && old.kind == kind)) { "Wpis należy do innej zmiany lub sekcji." }
             val values = ContentValues().apply {
                 put("id", id); put("scope", scope); put("kind", kind.name)
-                put("title", title.trim()); put("body", body.trim())
+                put("title", title.trim()); put("body", withNoteAuthor(body, if (old == null) author else old.author))
                 put("completed", if (old?.completed == true && kind == NoteKind.REMINDER) 1 else 0)
                 put("created_at", old?.createdAt ?: now); put("updated_at", now)
             }

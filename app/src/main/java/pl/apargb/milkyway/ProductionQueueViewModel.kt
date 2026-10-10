@@ -53,8 +53,9 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
         it.returnToPending(entry, System.currentTimeMillis())
     }
 
-    fun addProductNote(requestId: String, entry: ProductionQueueEntry, stage: ProductNoteStage, text: String) = mutate(requestId) {
-        it.addProductNote(requestId, entry, stage, text, System.currentTimeMillis())
+    fun addProductNote(requestId: String, entry: ProductionQueueEntry, stage: ProductNoteStage, text: String) {
+        val author = CloudSession.get(getApplication()).state.value.noteAuthor
+        mutate(requestId) { it.addProductNote(requestId, entry, stage, text, System.currentTimeMillis(), author) }
     }
 
     fun setProductNoteImportant(note: ProductNote, important: Boolean) = mutate { it.setProductNoteImportant(note, important) }

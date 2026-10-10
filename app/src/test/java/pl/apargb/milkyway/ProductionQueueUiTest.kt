@@ -194,7 +194,7 @@ class ProductionQueueUiTest {
             compose.onNodeWithTag("queue-schedule-$id").assertDoesNotExist()
             val fullText = "Pilna\npartia\u00a0do realizacji jutro rano"
             ProductionQueueRepository(model.getApplication()).useForTest { repo ->
-                repo.addProductNote("long-${line.name}", repo.load().single { it.id == id }, ProductNoteStage.ORDER, fullText, 3L)
+                repo.addProductNote("long-${line.name}", repo.load().single { it.id == id }, ProductNoteStage.ORDER, fullText, 3L, author = "Piotr")
             }
             compose.runOnIdle { model.reload() }
             compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.loading } }
@@ -203,6 +203,7 @@ class ProductionQueueUiTest {
             assertEquals(before.width, after.width, .1f); assertEquals(before.height, after.height, .1f)
             compose.onNodeWithTag("product-notes-$id").performClick()
             compose.onNodeWithTag("product-note-long-${line.name}").performScrollTo().assertTextEquals(fullText)
+            compose.onNodeWithTag("product-note-author-long-${line.name}", true).assertTextEquals("Autor: Piotr")
             compose.onNodeWithText("Anuluj").performClick()
             if (line == ProductionLine.BUTTER) screenshot("zamowienie-dwa-slowa-notatki")
             val order = compose.runOnIdle { model.state.value.entries.single { it.id == id } }

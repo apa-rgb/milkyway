@@ -37,8 +37,9 @@ internal fun MilkywayRoot() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun CloudLoginPage(state: CloudSessionState, onSignIn: (String, String) -> Unit) {
+internal fun CloudLoginPage(state: CloudSessionState, onSignIn: (String, String, String) -> Unit) {
     var number by rememberSaveable { mutableStateOf("01") }
+    var name by rememberSaveable { mutableStateOf("") }
     // A password must never enter saved instance state, logs or application preferences.
     var password by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
@@ -47,7 +48,7 @@ internal fun CloudLoginPage(state: CloudSessionState, onSignIn: (String, String)
         Spacer(Modifier.height(36.dp))
         Text("Milkyway", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text("Wspólny dziennik produkcji", style = MaterialTheme.typography.titleMedium)
-        Text("Wybierz swoje konto i wpisz hasło.")
+        Text("Wybierz swoje konto i wpisz hasło. Możesz też podać imię widoczne przy notatkach.")
         ExposedDropdownMenuBox(expanded, onExpandedChange = { if (!state.checking) expanded = it }) {
             OutlinedTextField(number, {}, Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable).testTag("login-account"),
                 readOnly = true, enabled = !state.checking, label = { Text("Numer konta") },
@@ -57,10 +58,12 @@ internal fun CloudLoginPage(state: CloudSessionState, onSignIn: (String, String)
                     modifier = Modifier.testTag("login-account-$item"), onClick = { number = item; expanded = false }) }
             }
         }
+        OutlinedTextField(name, { name = it.take(60) }, Modifier.fillMaxWidth().testTag("login-name"),
+            enabled = !state.checking, singleLine = true, label = { Text("Twoje imię (opcjonalnie)") })
         OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth().testTag("login-password"),
             enabled = !state.checking, singleLine = true, label = { Text("Hasło") }, visualTransformation = PasswordVisualTransformation())
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("login-error")) }
-        Button(onClick = { onSignIn(number, password); password = "" }, enabled = !state.checking && password.isNotBlank(),
+        Button(onClick = { onSignIn(number, password, normalizeOperatorName(name)); password = "" }, enabled = !state.checking && password.isNotBlank(),
             modifier = Modifier.fillMaxWidth().testTag("login-submit")) { Text(if (state.checking) "Logowanie…" else "Zaloguj") }
         Text("Konta tworzy administrator zakładu. Nie musisz podawać adresu e-mail.", style = MaterialTheme.typography.bodySmall)
     }
@@ -75,8 +78,8 @@ internal fun CloudStatus(state: CloudSessionState, saving: Boolean) {
             !state.configured -> "Dane na tym telefonie · Chmura czeka na konfigurację"
             saving && !state.connected -> "Oczekiwanie na internet i potwierdzenie zapisu…"
             saving -> "Zapisywanie do wspólnej bazy…"
-            !state.connected -> "Konto ${state.number} · Brak internetu — podgląd zapisanych danych"
-            else -> "Konto ${state.number} · Aktualizacja na żywo"
+            !state.connected -> "${state.noteAuthor ?: "Konto ${state.number}"} · Brak internetu — podgląd zapisanych danych"
+            else -> "${state.noteAuthor ?: "Konto ${state.number}"} · Aktualizacja na żywo"
         }, style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("cloud-status"))
     }
 }

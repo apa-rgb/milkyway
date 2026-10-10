@@ -330,7 +330,7 @@ internal class ProductionQueueRepository(context: Context,
     }
 
     @Synchronized fun addProductNote(requestId: String, entry: ProductionQueueEntry, stage: ProductNoteStage,
-                                     text: String, now: Long): List<ProductionQueueEntry> {
+                                     text: String, now: Long, author: String? = null): List<ProductionQueueEntry> {
         require(requestId.isNotBlank()) { "Brak identyfikatora notatki." }
         require(noteBody(text).trim().isNotEmpty() && noteBody(text).trim().length <= 4000) { "Wpisz notatkę (do 4000 znaków)." }
         val db = helper.writableDatabase
@@ -349,7 +349,7 @@ internal class ProductionQueueRepository(context: Context,
                 }) { "Etap produktu został zmieniony. Otwórz notatki ponownie." }
                 db.insertOrThrow("production_product_notes", null, ContentValues().apply {
                     put("id", requestId); put("entry_id", current.id); put("stage", stage.name)
-                    put("note", text.trim()); put("created_at", now)
+                    put("note", withNoteAuthor(text, author)); put("created_at", now)
                 })
             }
             db.setTransactionSuccessful()
@@ -365,7 +365,7 @@ internal class ProductionQueueRepository(context: Context,
                 .use { if (it.moveToFirst()) it.getString(0) to it.getString(1) else null }
                 ?: throw IllegalArgumentException("Nie znaleziono notatki.")
             require(current.first == note.entryId && !note.copy(text = current.second).isProductionCode()) { "To nie jest notatka produktu." }
-            db.update("production_product_notes", ContentValues().apply { put("note", withImportantText(noteBody(current.second), important)) },
+            db.update("production_product_notes", ContentValues().apply { put("note", withImportantText(current.second, important)) },
                 "id = ?", arrayOf(note.id))
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }

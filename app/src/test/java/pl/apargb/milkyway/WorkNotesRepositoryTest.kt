@@ -90,4 +90,18 @@ class WorkNotesRepositoryTest {
         assertThrows(IllegalArgumentException::class.java) { repository.setCompleted(before.single(), true, 200L) }
         assertEquals(before, repository.load())
     }
+
+    @Test fun fullLengthImportantNoteKeepsItsOriginalAuthorAfterEditingAndLegacyNotesStayAnonymous() {
+        val body = "x".repeat(10000)
+        repository.save("new", 1, NoteKind.CURRENT_NOTES, "Długa notatka", withImportantText(body, true), 1L, author = "Anna")
+        repository.save("legacy", 1, NoteKind.CURRENT_NOTES, "Stary wpis", "Treść", 2L)
+        repository.close(); repository = WorkNotesRepository(context)
+        val initial = repository.load().single { it.id == "new" }
+        assertEquals(body, initial.visibleBody); assertEquals("Anna", initial.author); assertTrue(initial.important)
+        repository.save("new", 1, NoteKind.CURRENT_NOTES, "Zmieniona", withImportantText("Nowa treść", false), 3L, author = "Piotr")
+        repository.save("legacy", 1, NoteKind.CURRENT_NOTES, "Stary wpis", "Poprawiona", 4L, author = "Piotr")
+        assertEquals("Anna", repository.load().single { it.id == "new" }.author)
+        assertNull(repository.load().single { it.id == "legacy" }.author)
+        assertEquals(1L, repository.load().single { it.id == "new" }.createdAt)
+    }
 }

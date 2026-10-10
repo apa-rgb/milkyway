@@ -21,7 +21,7 @@ internal fun operatorEmail(number: String, project: String): String {
 
 internal data class CloudSessionState(val configured: Boolean = false, val checking: Boolean = false,
     val uid: String? = null, val number: String? = null, val laboratory: Boolean = false, val connected: Boolean = false,
-    val ready: Boolean = false, val revision: Long = 0, val error: String? = null)
+    val ready: Boolean = false, val revision: Long = 0, val error: String? = null, val displayName: String? = null)
 
 /** One authenticated session. Never mix private device data into a shared plant automatically. */
 internal class CloudSession private constructor(private val context: Context) {
@@ -33,6 +33,8 @@ internal class CloudSession private constructor(private val context: Context) {
     private val listeners = mutableListOf<Pair<DatabaseReference, ValueEventListener>>()
     private var listenerGeneration = 0L
     private var loginError: String? = null
+    private val profile = OperatorProfile(context)
+    private var pendingLoginName: Pair<String, String>? = null
     private val app: FirebaseApp? = if (configured) FirebaseApp.initializeApp(context, FirebaseOptions.Builder()
         .setProjectId(BuildConfig.FIREBASE_PROJECT_ID).setApiKey(BuildConfig.FIREBASE_API_KEY)
         .setApplicationId(BuildConfig.FIREBASE_APP_ID).setDatabaseUrl(BuildConfig.FIREBASE_DATABASE_URL).build(), "milkyway") else null
@@ -66,23 +68,31 @@ internal class CloudSession private constructor(private val context: Context) {
                 auth?.signOut()
                 mutableState.value = mutableState.value.copy(checking = false, error = "To konto nie ma dostępu do tego zakładu.")
             } else {
-                mutableState.value = mutableState.value.copy(uid = user.uid, number = number, laboratory = role == "laboratory")
+                pendingLoginName?.takeIf { it.first == user.email }?.let { profile.save(user.uid, it.second) }
+                pendingLoginName = null
+                mutableState.value = mutableState.value.copy(uid = user.uid, number = number, laboratory = role == "laboratory",
+                    displayName = profile.name(user.uid).takeIf { it.isNotBlank() })
                 attach(user.uid)
             }
         }
     }
 
-    fun signIn(number: String, password: String) {
+    fun signIn(number: String, password: String, name: String) {
         val auth = auth ?: return
         if (mutableState.value.checking) return
         if (password.isBlank()) { mutableState.value = mutableState.value.copy(error = "Wpisz hasło."); return }
         loginError = null
+        val email = operatorEmail(number, BuildConfig.FIREBASE_PROJECT_ID)
+        pendingLoginName = email to normalizeOperatorName(name)
         mutableState.value = mutableState.value.copy(checking = true, error = null)
-        auth.signInWithEmailAndPassword(operatorEmail(number, BuildConfig.FIREBASE_PROJECT_ID), password)
-            .addOnFailureListener { mutableState.value = mutableState.value.copy(checking = false, error = "Nie udało się zalogować. Sprawdź hasło i połączenie.") }
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnFailureListener {
+                pendingLoginName = null
+                mutableState.value = mutableState.value.copy(checking = false, error = "Nie udało się zalogować. Sprawdź hasło i połączenie.")
+            }
     }
 
-    fun signOut() { loginError = null; auth?.signOut() }
+    fun signOut() { loginError = null; pendingLoginName = null; auth?.signOut() }
     fun retry() {
         auth?.currentUser?.let { user ->
             detach()

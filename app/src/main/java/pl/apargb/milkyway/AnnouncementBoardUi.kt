@@ -111,6 +111,7 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
                                     color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
                                 Text("Dodano: ${announcementTimestamp(note.createdAt)}", Modifier.testTag("announcement-created-${note.id}"),
                                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                NoteAuthorLabel(note.author, Modifier.testTag("announcement-author-${note.id}"))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Checkbox(note.completed, { model.setCompleted(note, it) }, enabled = enabled,
                                         modifier = Modifier.testTag("announcement-done-${note.id}"))

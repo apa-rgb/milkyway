@@ -25,6 +25,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
             Column(Modifier.testTag("product-notes-dialog"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
                 Text("${entry.line.title} · ${stage.title}", style = MaterialTheme.typography.bodySmall)
+                NoteAuthorLabel(currentNoteAuthor(), Modifier.testTag("product-note-new-author"))
                 OutlinedTextField(text, onValueChange = { text = it.take(4000); model.clearError() }, label = { Text("Nowa notatka") },
                     modifier = Modifier.fillMaxWidth().testTag("product-note-input"), minLines = 3, enabled = !ui.saving,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
@@ -47,6 +48,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("${note.stage.title} · ${dateLabel(note.createdAt)}", style = MaterialTheme.typography.labelSmall,
                                 color = entry.line.tone.accent)
+                            NoteAuthorLabel(note.author, Modifier.testTag("product-note-author-${note.id}"))
                             if (!note.isProductionCode()) Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(note.important, { model.setProductNoteImportant(note, it) }, enabled = !ui.saving,
                                     modifier = Modifier.testTag("product-note-important-${note.id}"))
