@@ -444,7 +444,7 @@ private fun PlanningCard(entry: ProductionQueueEntry, title: String, enabled: Bo
                     IconButton(onClick = onNotes, enabled = enabled, modifier = Modifier.size(24.dp).testTag("product-notes-${entry.id}")) {
                         Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(15.dp), tint = entry.line.tone.accent)
                     }
-                    if (!entry.pendingOrder && entry.date == LocalDate.now()) {
+                    if (!entry.pendingOrder && canRecordProductionOn(entry.date)) {
                         IconButton(onClick = onComplete, enabled = enabled && entry.remainingAmount?.signum() == 1,
                             modifier = Modifier.size(24.dp).testTag("queue-produced-${entry.id}")) {
                             Icon(Icons.Outlined.TaskAlt, "Wyprodukowano: ${entry.title}", Modifier.size(17.dp), tint = entry.line.tone.accent)

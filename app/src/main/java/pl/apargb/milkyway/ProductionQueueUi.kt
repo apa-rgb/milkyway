@@ -148,7 +148,7 @@ internal fun ProductionCompletionBubble(entry: ProductionQueueEntry, ui: Product
     var amount by rememberSaveable { mutableStateOf("") }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     val remaining = entry.remainingAmount
-    val allowed = entry.date == LocalDate.now() && remaining?.signum() == 1
+    val allowed = canRecordProductionOn(entry.date) && remaining?.signum() == 1
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {

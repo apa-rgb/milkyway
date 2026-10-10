@@ -24,11 +24,12 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
-internal fun ProductionCompletedPage(ui: ProductionQueueState, model: ProductionQueueViewModel) {
+internal fun ProductionCompletedPage(ui: ProductionQueueState, model: ProductionQueueViewModel, now: java.time.Instant = java.time.Instant.now()) {
+    val currentDay = warehouseProductionDay(now)
     var department by rememberSaveable { mutableStateOf<String?>(null) }
     val firstDay = LocalDate.of(1900, 1, 1)
     val lastDay = LocalDate.of(2100, 12, 31)
-    val days = rememberPagerState(initialPage = ChronoUnit.DAYS.between(firstDay, LocalDate.now()).toInt()) {
+    val days = rememberPagerState(initialPage = ChronoUnit.DAYS.between(firstDay, currentDay).toInt()) {
         ChronoUnit.DAYS.between(firstDay, lastDay).toInt() + 1
     }
     val scope = rememberCoroutineScope()
@@ -64,11 +65,13 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
             TextButton(onClick = { calendarOpen = true }, enabled = !ui.saving, modifier = Modifier.weight(1f).testTag("completed-date")) {
                 Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(queueDateLabel(date))
             }
-            TextButton(onClick = { changeDay(LocalDate.now()) }, enabled = !ui.saving && date != LocalDate.now(),
-                modifier = Modifier.testTag("completed-today"), contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Dzisiaj") }
+            TextButton(onClick = { changeDay(currentDay) }, enabled = !ui.saving && date != currentDay,
+                modifier = Modifier.testTag("completed-today"), contentPadding = PaddingValues(horizontal = 4.dp)) { Text("Bieżący") }
             IconButton(onClick = { changeDay(date.plusDays(1)) }, enabled = !ui.saving && date < LocalDate.of(2100, 12, 31),
                 modifier = Modifier.testTag("completed-next-day")) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Następny dzień rejestru", Modifier.size(18.dp)) }
         }
+        Text("Dzień produkcyjny: 09:00 – 09:00 następnego dnia", Modifier.padding(horizontal = 12.dp).testTag("completed-day-window"),
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(department == null, onClick = { department = null }, label = { Text("Wszystkie") })
             ProductionLine.entries.forEach { item ->

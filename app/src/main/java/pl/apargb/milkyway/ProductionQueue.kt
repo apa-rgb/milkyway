@@ -108,7 +108,7 @@ internal class ProductionQueueDatabase(context: Context, name: String? = NAME) :
 
 internal class ProductionQueueRepository(context: Context,
                                          private val helper: ProductionQueueDatabase = ProductionQueueDatabase(context),
-                                         private val today: () -> LocalDate = { LocalDate.now() }) {
+                                         private val today: () -> LocalDate = { LocalDate.now(WarehouseZone) }) {
     @Synchronized fun load(): List<ProductionQueueEntry> = helper.readableDatabase.query("production_queue", null,
         null, null, null, null, "line, plan_date, position").use { cursor ->
         buildList { while (cursor.moveToNext()) add(cursor.entry()) }
@@ -336,7 +336,7 @@ internal class ProductionQueueRepository(context: Context,
                 val current = find(db, id) ?: throw IllegalArgumentException("Nie znaleziono produkcji.")
                 require(current.line == line && current.date == date) { "Pozycja nie należy już do wybranego dnia i działu." }
                 require(!current.pendingOrder) { "Najpierw zaplanuj zamówienie w produkcji." }
-                require(date == today()) { "Wykonanie można zapisać tylko w kolejce bieżącego dnia." }
+                require(canRecordProductionOn(date, java.time.Instant.ofEpochMilli(now), today())) { "Wykonanie można zapisać dla bieżącego dnia; kolejka poprzedniego dnia jest dostępna do 09:00." }
                 val remaining = current.remainingAmount ?: throw IllegalArgumentException("Najpierw uzupełnij planowaną ilość.")
                 require(remaining.signum() > 0) { "Ta pozycja jest już w katalogu Wyprodukowano." }
                 val producedNow = amount ?: remaining
@@ -346,7 +346,7 @@ internal class ProductionQueueRepository(context: Context,
                 }, "id = ?", arrayOf(id))
                 db.insertOrThrow("production_completions", null, ContentValues().apply {
                     put("id", requestId); put("entry_id", id); put("amount", producedNow.toPlainString())
-                    put("produced_on", date.toString()); put("occurred_at", now)
+                    put("produced_on", warehouseProductionDay(java.time.Instant.ofEpochMilli(now)).toString()); put("occurred_at", now)
                 })
             }
             db.setTransactionSuccessful()

@@ -2,6 +2,22 @@ package pl.apargb.milkyway
 
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+
+// One factory time zone keeps the warehouse date consistent across operators' phones.
+internal val WarehouseZone: ZoneId = ZoneId.of("Europe/Warsaw")
+internal val ProductionDayStart: LocalTime = LocalTime.of(9, 0)
+
+internal fun warehouseProductionDay(now: Instant = Instant.now()): LocalDate {
+    val local = now.atZone(WarehouseZone)
+    return if (local.toLocalTime() < ProductionDayStart) local.toLocalDate().minusDays(1) else local.toLocalDate()
+}
+
+internal fun canRecordProductionOn(date: LocalDate, now: Instant = Instant.now(),
+                                   calendarDay: LocalDate = now.atZone(WarehouseZone).toLocalDate()): Boolean =
+    date == calendarDay || (date == calendarDay.minusDays(1) && date == warehouseProductionDay(now))
 
 internal const val WAREHOUSE_TITLE = "Magazyn/Wyprodukowano"
 

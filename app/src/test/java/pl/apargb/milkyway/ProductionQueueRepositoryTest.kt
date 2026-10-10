@@ -43,7 +43,7 @@ class ProductionQueueRepositoryTest {
         val c = repository.load().single { it.id == "c" }
         val a = repository.load().single { it.id == "a" }
         repository.addProductNote("note", c, ProductNoteStage.PRODUCTION, "Keep this note", 110L)
-        repository.recordProduction("partial", c.id, c.line, c.date, BigDecimal("100"), 111L)
+        repository.recordProduction("partial", c.id, c.line, c.date, BigDecimal("100"), productionTimestamp(c.date, 111L))
         repository.reorder(c, a, false, 200L)
         assertEquals(listOf("c", "a", "b", "other"), ids())
         repository.reorder(c, a, true, 201L)
@@ -162,17 +162,17 @@ class ProductionQueueRepositoryTest {
 
     @Test fun partialProductionSumsExactlyRetriesOnceAndFullCompletesOnlyRemainingAmount() {
         repository.save("a", ProductionLine.BUTTER, today, "Masło", "", 100L, BigDecimal("1000.125"))
-        repository.recordProduction("receipt-1", "a", ProductionLine.BUTTER, today, BigDecimal("200.025"), 200L)
-        repository.recordProduction("receipt-1", "a", ProductionLine.BUTTER, today, BigDecimal("200.025"), 200L)
-        repository.recordProduction("receipt-2", "a", ProductionLine.BUTTER, today, BigDecimal("300.100"), 300L)
+        repository.recordProduction("receipt-1", "a", ProductionLine.BUTTER, today, BigDecimal("200.025"), productionTimestamp(today, 200L))
+        repository.recordProduction("receipt-1", "a", ProductionLine.BUTTER, today, BigDecimal("200.025"), productionTimestamp(today, 200L))
+        repository.recordProduction("receipt-2", "a", ProductionLine.BUTTER, today, BigDecimal("300.100"), productionTimestamp(today, 300L))
         val partial = repository.load().single()
         assertEquals(0, BigDecimal("500.125").compareTo(partial.producedAmount))
         assertEquals(0, BigDecimal("500.000").compareTo(partial.remainingAmount))
         assertEquals(ProductionQuantityUnit.KG, partial.unit)
         repository.close()
         repository = ProductionQueueRepository(context, today = { today })
-        repository.recordProduction("receipt-full", "a", ProductionLine.BUTTER, today, null, 400L)
-        repository.recordProduction("receipt-full", "a", ProductionLine.BUTTER, today, null, 400L)
+        repository.recordProduction("receipt-full", "a", ProductionLine.BUTTER, today, null, productionTimestamp(today, 400L))
+        repository.recordProduction("receipt-full", "a", ProductionLine.BUTTER, today, null, productionTimestamp(today, 400L))
         val full = repository.load().single()
         assertEquals(0, full.plannedAmount!!.compareTo(full.producedAmount))
         assertEquals(0, full.remainingAmount!!.signum())
@@ -191,20 +191,20 @@ class ProductionQueueRepositoryTest {
         val before = repository.load()
         listOf(BigDecimal.ZERO, BigDecimal("-1"), BigDecimal("0.0001")).forEachIndexed { i, amount ->
             assertThrows(IllegalArgumentException::class.java) {
-                repository.recordProduction("invalid-$i", "a", ProductionLine.UHT, today, amount, 200L)
+                repository.recordProduction("invalid-$i", "a", ProductionLine.UHT, today, amount, productionTimestamp(today, 200L))
             }
         }
-        assertThrows(IllegalArgumentException::class.java) { repository.recordProduction("future", "future", ProductionLine.UHT, tomorrow, null, 200L) }
-        assertThrows(IllegalArgumentException::class.java) { repository.recordProduction("wrong-line", "a", ProductionLine.BUTTER, today, null, 200L) }
+        assertThrows(IllegalArgumentException::class.java) { repository.recordProduction("future", "future", ProductionLine.UHT, tomorrow, null, productionTimestamp(tomorrow, 200L)) }
+        assertThrows(IllegalArgumentException::class.java) { repository.recordProduction("wrong-line", "a", ProductionLine.BUTTER, today, null, productionTimestamp(today, 200L)) }
         assertEquals(before, repository.load())
-        repository.recordProduction("current-uht", "a", ProductionLine.UHT, today, BigDecimal("250"), 300L)
+        repository.recordProduction("current-uht", "a", ProductionLine.UHT, today, BigDecimal("250"), productionTimestamp(today, 300L))
         assertEquals(ProductionQuantityUnit.LITRES, repository.load().single { it.id == "a" }.unit)
         assertEquals(BigDecimal("750"), repository.load().single { it.id == "a" }.remainingAmount)
     }
 
     @Test fun editingAndReschedulingRetainExecutionAndDoNotAllowPlanBelowProducedAmount() {
         repository.save("a", ProductionLine.POWDER, today, "Proszek", "", 100L, BigDecimal("1000"))
-        repository.recordProduction("powder-partial", "a", ProductionLine.POWDER, today, BigDecimal("200"), 200L)
+        repository.recordProduction("powder-partial", "a", ProductionLine.POWDER, today, BigDecimal("200"), productionTimestamp(today, 200L))
         assertThrows(IllegalArgumentException::class.java) {
             repository.save("a", ProductionLine.POWDER, today, "Proszek", "", 300L, BigDecimal("199"))
         }
@@ -227,7 +227,7 @@ class ProductionQueueRepositoryTest {
         database.writableDatabase.execSQL("""CREATE TRIGGER reject_completion BEFORE INSERT ON production_completions
             BEGIN SELECT RAISE(ABORT, 'simulated receipt failure'); END""")
         assertThrows(SQLiteException::class.java) {
-            repository.recordProduction("failed", "a", ProductionLine.BUTTER, today, BigDecimal("250"), 200L)
+            repository.recordProduction("failed", "a", ProductionLine.BUTTER, today, BigDecimal("250"), productionTimestamp(today, 200L))
         }
         assertEquals(before, repository.load())
     }
@@ -250,10 +250,10 @@ class ProductionQueueRepositoryTest {
         assertEquals(BigDecimal.ZERO, migrated.producedAmount)
         assertEquals(ProductionQuantityUnit.LITRES, migrated.unit)
         assertThrows(IllegalArgumentException::class.java) {
-            repository.recordProduction("missing-plan", "old", ProductionLine.UHT, today, BigDecimal("100"), 300L)
+            repository.recordProduction("missing-plan", "old", ProductionLine.UHT, today, BigDecimal("100"), productionTimestamp(today, 300L))
         }
         repository.save("old", ProductionLine.UHT, today, "Mleko", "Opis", 300L, BigDecimal("1000"))
-        repository.recordProduction("old-complete", "old", ProductionLine.UHT, today, null, 400L)
+        repository.recordProduction("old-complete", "old", ProductionLine.UHT, today, null, productionTimestamp(today, 400L))
         assertEquals(BigDecimal.ZERO, repository.load().single().remainingAmount)
     }
 
@@ -318,7 +318,7 @@ class ProductionQueueRepositoryTest {
             val order = repository.load().single { it.line == line }
             assertTrue(order.pendingOrder); assertNull(order.productionDate); assertNull(order.scheduledTime)
             assertThrows(IllegalArgumentException::class.java) {
-                repository.recordProduction("unplanned-${line.name}", order.id, line, today, null, 200L)
+                repository.recordProduction("unplanned-${line.name}", order.id, line, today, null, productionTimestamp(today, 200L))
             }
             repository.schedule(order, tomorrow, java.time.LocalTime.of(14, 35), 300L)
             assertThrows(IllegalArgumentException::class.java) { repository.schedule(order, today, java.time.LocalTime.NOON, 400L) }
@@ -344,7 +344,7 @@ class ProductionQueueRepositoryTest {
         repository.move("b", line, today, -1, 201L)
         assertEquals(java.time.LocalTime.of(9, 0), repository.load().single { it.id == "other-hour" }.scheduledTime)
         assertTrue(repository.load().single { it.id == "order" }.pendingOrder)
-        repository.recordProduction("partial", "a", line, today, BigDecimal("250"), 300L)
+        repository.recordProduction("partial", "a", line, today, BigDecimal("250"), productionTimestamp(today, 300L))
         val partial = repository.load().single { it.id == "a" }
         repository.schedule(partial, tomorrow, java.time.LocalTime.of(23, 45), 400L)
         val planned = repository.load().single { it.id == "a" }
@@ -391,25 +391,25 @@ class ProductionQueueRepositoryTest {
         val migrated = repository.load().single()
         assertFalse(migrated.pendingOrder); assertNull(migrated.scheduledTime); assertEquals(today, migrated.productionDate)
         assertEquals(4L, migrated.position); assertEquals(BigDecimal("800"), migrated.remainingAmount)
-        repository.recordProduction("receipt", "old", ProductionLine.BUTTER, today, BigDecimal("200"), 300L)
+        repository.recordProduction("receipt", "old", ProductionLine.BUTTER, today, BigDecimal("200"), productionTimestamp(today, 300L))
         assertEquals(BigDecimal("200"), repository.load().single().producedAmount)
     }
 
     @Test fun excessCompletesAllLinesKeepsOrderedAmountAndRecordsExecutionExactlyOnce() {
         ProductionLine.entries.forEach { line ->
             repository.save(line.name, line, today, "Towar", "", 100L, BigDecimal("1000"))
-            repository.recordProduction("partial-${line.name}", line.name, line, today, BigDecimal("400"), 200L)
+            repository.recordProduction("partial-${line.name}", line.name, line, today, BigDecimal("400"), productionTimestamp(today, 200L))
             val partial = repository.load().single { it.line == line }
             assertFalse(partial.completed); assertEquals(BigDecimal("600"), partial.remainingAmount)
-            repository.recordProduction("excess-${line.name}", line.name, line, today, BigDecimal("800"), 300L)
-            repository.recordProduction("excess-${line.name}", line.name, line, today, BigDecimal("800"), 300L)
+            repository.recordProduction("excess-${line.name}", line.name, line, today, BigDecimal("800"), productionTimestamp(today, 300L))
+            repository.recordProduction("excess-${line.name}", line.name, line, today, BigDecimal("800"), productionTimestamp(today, 300L))
             val completed = repository.load().single { it.line == line }
             assertTrue(completed.completed); assertEquals(BigDecimal("1200"), completed.producedAmount)
             assertEquals(BigDecimal("1000"), completed.plannedAmount); assertEquals(BigDecimal("200"), completed.excessAmount)
             assertEquals(BigDecimal.ZERO, completed.remainingAmount)
             repository.save(line.name, line, today, "Poprawiony opis", "Uwagi", 400L, BigDecimal("1000"))
             assertThrows(IllegalArgumentException::class.java) {
-                repository.recordProduction("after-completed-${line.name}", line.name, line, today, BigDecimal.ONE, 500L)
+                repository.recordProduction("after-completed-${line.name}", line.name, line, today, BigDecimal.ONE, productionTimestamp(today, 500L))
             }
         }
         repository.close(); repository = ProductionQueueRepository(context, today = { today })
@@ -421,7 +421,7 @@ class ProductionQueueRepositoryTest {
 
     @Test fun completionCatalogDatesAndAmountsSurviveReschedulingPartialRemainder() {
         repository.save("part", ProductionLine.POWDER, today, "Proszek", "", 100L, BigDecimal("1000.125"))
-        repository.recordProduction("first", "part", ProductionLine.POWDER, today, BigDecimal("250.125"), 200L)
+        repository.recordProduction("first", "part", ProductionLine.POWDER, today, BigDecimal("250.125"), productionTimestamp(today, 200L))
         val part = repository.load().single()
         repository.schedule(part, tomorrow, java.time.LocalTime.NOON, 300L)
         val snapshot = repository.snapshot()
@@ -429,14 +429,14 @@ class ProductionQueueRepositoryTest {
         assertEquals(BigDecimal("750.000"), snapshot.entries.single().remainingAmount)
         assertEquals(BigDecimal("250.125"), snapshot.completions.single().amount)
         assertEquals(today, snapshot.completions.single().producedOn)
-        assertEquals(200L, snapshot.completions.single().occurredAt)
+        assertEquals(productionTimestamp(today, 200L), snapshot.completions.single().occurredAt)
     }
 
     @Test fun reorderingActiveGoodsSkipsEntriesAlreadyMovedToCompletedCatalog() {
         listOf("a", "completed", "c").forEach { id ->
             repository.save(id, ProductionLine.BUTTER, today, id, "", 100L, BigDecimal("1000"))
         }
-        repository.recordProduction("full", "completed", ProductionLine.BUTTER, today, null, 200L)
+        repository.recordProduction("full", "completed", ProductionLine.BUTTER, today, null, productionTimestamp(today, 200L))
         repository.move("c", ProductionLine.BUTTER, today, -1, 300L)
         assertEquals(listOf("c", "a"), repository.load().filter { !it.completed }.map { it.id })
         assertEquals(BigDecimal("1000"), repository.load().single { it.id == "completed" }.producedAmount)
@@ -452,10 +452,10 @@ class ProductionQueueRepositoryTest {
             repository.schedule(order, today, java.time.LocalTime.of(9, 15), 200L)
             val plan = repository.load().single { it.line == line }
             repository.addProductNote("plan-note-${line.name}", plan, ProductNoteStage.PRODUCTION, "Uwagi operatora", 201L)
-            repository.recordProduction("partial-${line.name}", line.name, line, today, BigDecimal("400"), 300L)
+            repository.recordProduction("partial-${line.name}", line.name, line, today, BigDecimal("400"), productionTimestamp(today, 300L))
             val partial = repository.load().single { it.line == line }
             repository.addProductNote("partial-note-${line.name}", partial, ProductNoteStage.COMPLETED, "Kontrola partii", 301L)
-            repository.recordProduction("full-${line.name}", line.name, line, today, null, 400L)
+            repository.recordProduction("full-${line.name}", line.name, line, today, null, productionTimestamp(today, 400L))
             repository.addProductNote("done-note-${line.name}", repository.load().single { it.line == line }, ProductNoteStage.COMPLETED, "Gotowe do odbioru", 401L)
         }
         val before = repository.snapshot()
@@ -501,7 +501,7 @@ class ProductionQueueRepositoryTest {
             assertTrue(waiting.pendingOrder); assertNull(waiting.productionDate); assertNull(waiting.scheduledTime)
             assertEquals(BigDecimal("1000"), waiting.remainingAmount)
             repository.schedule(waiting, today, java.time.LocalTime.NOON, 300L)
-            repository.recordProduction("partial-${line.name}", line.name, line, today, BigDecimal("400"), 400L)
+            repository.recordProduction("partial-${line.name}", line.name, line, today, BigDecimal("400"), productionTimestamp(today, 400L))
             val before = repository.snapshot()
             repository.returnToPending(before.entries.single { it.id == line.name }, 500L)
             val after = repository.snapshot()
@@ -512,7 +512,7 @@ class ProductionQueueRepositoryTest {
             assertEquals(BigDecimal("1000"), partialWaiting.plannedAmount)
             assertEquals(BigDecimal("400"), partialWaiting.producedAmount); assertEquals(BigDecimal("600"), partialWaiting.remainingAmount)
             assertThrows(IllegalArgumentException::class.java) {
-                repository.recordProduction("not-scheduled-${line.name}", line.name, line, today, null, 501L)
+                repository.recordProduction("not-scheduled-${line.name}", line.name, line, today, null, productionTimestamp(today, 501L))
             }
             repository.schedule(partialWaiting, tomorrow, java.time.LocalTime.of(14, 30), 600L)
             val rescheduled = repository.load().single { it.id == line.name }
@@ -541,7 +541,7 @@ class ProductionQueueRepositoryTest {
         assertEquals(before, repository.snapshot())
         database.writableDatabase.execSQL("DROP TRIGGER reject_return")
         repository.schedule(scheduled, today, java.time.LocalTime.NOON, 400L)
-        repository.recordProduction("full", "a", ProductionLine.UHT, today, null, 500L)
+        repository.recordProduction("full", "a", ProductionLine.UHT, today, null, productionTimestamp(today, 500L))
         val completed = repository.snapshot()
         assertThrows(IllegalArgumentException::class.java) { repository.returnToPending(completed.entries.single(), 600L) }
         assertThrows(IllegalArgumentException::class.java) { repository.save("a", ProductionLine.UHT, today, "Mleko", "", 600L, pendingOrder = true) }
@@ -550,7 +550,7 @@ class ProductionQueueRepositoryTest {
 
     @Test fun rejectedGoodsAreSeparateKilogramRecordsWithDatesRetryProtectionAndRestrictedDeletion() {
         repository.save("ordinary", ProductionLine.BUTTER, today, "Masło", "Opis", 100L, BigDecimal("1000"))
-        repository.recordProduction("ordinary-receipt", "ordinary", ProductionLine.BUTTER, today, BigDecimal("400"), 200L)
+        repository.recordProduction("ordinary-receipt", "ordinary", ProductionLine.BUTTER, today, BigDecimal("400"), productionTimestamp(today, 200L))
         val before = repository.snapshot()
         ProductionLine.entries.forEach { line ->
             repository.addRejectedGoods("reject-${line.name}", line, today, "  Brak jakościowy  ", BigDecimal("12.345"), 300L)
@@ -604,7 +604,7 @@ class ProductionQueueRepositoryTest {
         repository.save("a", ProductionLine.BUTTER, today, "Masło", "Opis", 100L, BigDecimal("1000"))
         val entry = repository.load().single()
         repository.addProductNote("note", entry, ProductNoteStage.PRODUCTION, "Notatka", 101L)
-        repository.recordProduction("partial", "a", ProductionLine.BUTTER, today, BigDecimal("250"), 200L)
+        repository.recordProduction("partial", "a", ProductionLine.BUTTER, today, BigDecimal("250"), productionTimestamp(today, 200L))
         val before = repository.snapshot()
         repository.close()
         context.openOrCreateDatabase(ProductionQueueDatabase.NAME, Context.MODE_PRIVATE, null).use { db ->
@@ -619,7 +619,7 @@ class ProductionQueueRepositoryTest {
 
     @Test fun schemaThreeUpgradeAddsNotesWithoutChangingScheduledHoursAmountsOrCompletionHistory() {
         repository.save("a", ProductionLine.UHT, today, "Mleko", "Opis zamówienia", 100L, BigDecimal("1000"), scheduledTime = java.time.LocalTime.of(9, 15))
-        repository.recordProduction("part", "a", ProductionLine.UHT, today, BigDecimal("250"), 200L)
+        repository.recordProduction("part", "a", ProductionLine.UHT, today, BigDecimal("250"), productionTimestamp(today, 200L))
         val before = repository.snapshot()
         repository.close()
         context.openOrCreateDatabase(ProductionQueueDatabase.NAME, Context.MODE_PRIVATE, null).use { db ->
@@ -637,11 +637,11 @@ class ProductionQueueRepositoryTest {
 
     @Test fun warehouseRemovalRequiresPinPreservesLedgerAndOtherDaysAndSurvivesRetryAndReopening() {
         repository.save("product", ProductionLine.BUTTER, today, "Masło", "Opis", 100L, BigDecimal("1000"))
-        repository.recordProduction("first", "product", ProductionLine.BUTTER, today, BigDecimal("300"), 101L)
+        repository.recordProduction("first", "product", ProductionLine.BUTTER, today, BigDecimal("300"), productionTimestamp(today, 101L))
         repository.addProductNote("note", repository.load().single(), ProductNoteStage.COMPLETED, "Ważna notatka", 102L)
         repository.close(); repository = ProductionQueueRepository(context, today = { tomorrow })
         repository.schedule(repository.load().single(), tomorrow, java.time.LocalTime.NOON, 200L)
-        repository.recordProduction("second", "product", ProductionLine.BUTTER, tomorrow, BigDecimal("200"), 201L)
+        repository.recordProduction("second", "product", ProductionLine.BUTTER, tomorrow, BigDecimal("200"), productionTimestamp(tomorrow, 201L))
         val before = repository.snapshot()
         assertThrows(IllegalArgumentException::class.java) {
             repository.removeFromWarehouse("remove", "product", today, setOf("first"), "2426", 300L)
@@ -661,15 +661,15 @@ class ProductionQueueRepositoryTest {
 
     @Test fun staleRemovalNeverHidesNewProductionAndNewReceiptsRemainVisibleAfterRemoval() {
         repository.save("product", ProductionLine.POWDER, today, "Proszek", "", 100L, BigDecimal("1000"))
-        repository.recordProduction("first", "product", ProductionLine.POWDER, today, BigDecimal("200"), 101L)
-        repository.recordProduction("second", "product", ProductionLine.POWDER, today, BigDecimal("300"), 102L)
+        repository.recordProduction("first", "product", ProductionLine.POWDER, today, BigDecimal("200"), productionTimestamp(today, 101L))
+        repository.recordProduction("second", "product", ProductionLine.POWDER, today, BigDecimal("300"), productionTimestamp(today, 102L))
         val before = repository.snapshot()
         assertThrows(IllegalArgumentException::class.java) {
             repository.removeFromWarehouse("stale", "product", today, setOf("first"), "5522", 200L)
         }
         assertEquals(before, repository.snapshot())
         repository.removeFromWarehouse("remove", "product", today, setOf("first", "second"), "5522", 201L)
-        repository.recordProduction("third", "product", ProductionLine.POWDER, today, BigDecimal("100"), 202L)
+        repository.recordProduction("third", "product", ProductionLine.POWDER, today, BigDecimal("100"), productionTimestamp(today, 202L))
         repository.removeFromWarehouse("remove", "product", today, setOf("first", "second"), "5522", 203L)
         val after = repository.snapshot()
         assertEquals(BigDecimal("100"), completedProductsForDay(after.entries, after.completions, today).single().amount)
@@ -679,7 +679,7 @@ class ProductionQueueRepositoryTest {
 
     @Test fun versionFiveMigrationPreservesPlansReceiptsNotesAndRejectedGoods() {
         repository.save("product", ProductionLine.UHT, today, "Mleko", "Opis", 100L, BigDecimal("1000"))
-        repository.recordProduction("first", "product", ProductionLine.UHT, today, BigDecimal("200"), 101L)
+        repository.recordProduction("first", "product", ProductionLine.UHT, today, BigDecimal("200"), productionTimestamp(today, 101L))
         repository.addProductNote("note", repository.load().single(), ProductNoteStage.COMPLETED, "Notatka partii", 102L)
         repository.addRejectedGoods("reject", ProductionLine.UHT, today, "Brak", BigDecimal("3"), 103L)
         val before = repository.snapshot(); repository.close()
@@ -698,4 +698,53 @@ class ProductionQueueRepositoryTest {
         assertTrue(completedProductsForDay(after.entries, after.completions, today).isEmpty())
         assertEquals(before.entries, after.entries); assertEquals(before.rejectedGoods, after.rejectedGoods)
     }
+    @Test fun overnightProductionUsesOneWarehouseDayAcrossAllLinesAndNineStartsANewDay() {
+        var calendarDay = today
+        repository.close()
+        repository = ProductionQueueRepository(context, today = { calendarDay })
+        fun at(date: LocalDate, time: String) = date.atTime(java.time.LocalTime.parse(time)).atZone(WarehouseZone).toInstant().toEpochMilli()
+        ProductionLine.entries.forEach { line ->
+            calendarDay = today
+            repository.save(line.name, line, today, "Partia nocna", "", at(today, "09:00"), BigDecimal("1000"))
+            repository.recordProduction("start-${line.name}", line.name, line, today, BigDecimal("100"), at(today, "09:00"))
+            calendarDay = tomorrow
+            repository.recordProduction("midnight-${line.name}", line.name, line, today, BigDecimal("200"), at(tomorrow, "00:00"))
+            repository.recordProduction("morning-${line.name}", line.name, line, today, BigDecimal("300"), at(tomorrow, "08:59:59.999"))
+            assertThrows(IllegalArgumentException::class.java) {
+                repository.recordProduction("too-late-${line.name}", line.name, line, today, BigDecimal("50"), at(tomorrow, "09:00"))
+            }
+            // Retrying a previously committed receipt after the boundary never duplicates it.
+            repository.recordProduction("morning-${line.name}", line.name, line, today, BigDecimal("300"), at(tomorrow, "09:00"))
+            repository.schedule(repository.load().single { it.id == line.name }, tomorrow, java.time.LocalTime.of(9, 0), at(tomorrow, "09:00"))
+            repository.recordProduction("new-day-${line.name}", line.name, line, tomorrow, null, at(tomorrow, "09:00"))
+        }
+        repository.close(); repository = ProductionQueueRepository(context, today = { calendarDay })
+        val snapshot = repository.snapshot()
+        ProductionLine.entries.forEach { line ->
+            assertEquals(BigDecimal("600"), completedProductsForDay(snapshot.entries, snapshot.completions, today, line).single().amount)
+            assertEquals(BigDecimal("400"), completedProductsForDay(snapshot.entries, snapshot.completions, tomorrow, line).single().amount)
+        }
+        val beforeRemoval = snapshot.completions.size
+        repository.removeFromWarehouse("remove-night", ProductionLine.BUTTER.name, today,
+            setOf("start-BUTTER", "midnight-BUTTER", "morning-BUTTER"), "5522", at(tomorrow, "10:00"))
+        val after = repository.snapshot()
+        assertEquals(beforeRemoval, after.completions.size)
+        assertTrue(completedProductsForDay(after.entries, after.completions, today, ProductionLine.BUTTER).isEmpty())
+        assertEquals(BigDecimal("400"), completedProductsForDay(after.entries, after.completions, tomorrow, ProductionLine.BUTTER).single().amount)
+    }
+
+    @Test fun earlyMorningCompletionOfCalendarTodaysQueueBelongsToPreviousWarehouseDay() {
+        val now = today.atTime(8, 30).atZone(WarehouseZone).toInstant().toEpochMilli()
+        repository.save("early", ProductionLine.POWDER, today, "Proszek rano", "", now, BigDecimal("500"))
+        repository.recordProduction("early-receipt", "early", ProductionLine.POWDER, today, null, now)
+        val snapshot = repository.snapshot()
+        assertEquals(today.minusDays(1), snapshot.completions.single().producedOn)
+        assertEquals(now, snapshot.completions.single().occurredAt)
+        val shared = SharedRows.capture(database, SharedDomain.PRODUCTION, emptyMap(), mapOf("uid" to "operator-01"), now)
+        SharedDomain.PRODUCTION.database(context).useDatabase { restored ->
+            SharedRows.restore(restored, SharedDomain.PRODUCTION, shared)
+            assertEquals(snapshot, ProductionQueueRepository(context, restored as ProductionQueueDatabase).snapshot())
+        }
+    }
+
 }

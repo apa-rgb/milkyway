@@ -73,9 +73,9 @@ class SharedRowsTest {
                 SharedRows.capture(helper, SharedDomain.PRODUCTION, previous, actor, 2000L)
             }
         var snapshot = apply(emptyMap(), actor1) { it.save("product", ProductionLine.BUTTER, day, "Masło", "", 1L, BigDecimal("1000")) }
-        snapshot = apply(snapshot, actor1) { it.recordProduction("first", "product", ProductionLine.BUTTER, day, BigDecimal("400"), 2L) }
-        snapshot = apply(snapshot, actor2) { it.recordProduction("second", "product", ProductionLine.BUTTER, day, BigDecimal("350"), 3L) }
-        snapshot = apply(snapshot, actor2) { it.recordProduction("second", "product", ProductionLine.BUTTER, day, BigDecimal("350"), 3L) }
+        snapshot = apply(snapshot, actor1) { it.recordProduction("first", "product", ProductionLine.BUTTER, day, BigDecimal("400"), productionTimestamp(day, 2L)) }
+        snapshot = apply(snapshot, actor2) { it.recordProduction("second", "product", ProductionLine.BUTTER, day, BigDecimal("350"), productionTimestamp(day, 3L)) }
+        snapshot = apply(snapshot, actor2) { it.recordProduction("second", "product", ProductionLine.BUTTER, day, BigDecimal("350"), productionTimestamp(day, 3L)) }
         ProductionQueueDatabase(context, null).useDatabase { helper ->
             SharedRows.restore(helper, SharedDomain.PRODUCTION, snapshot)
             val repo = ProductionQueueRepository(context, helper as ProductionQueueDatabase)
@@ -83,7 +83,7 @@ class SharedRowsTest {
             assertEquals(BigDecimal("750"), entry.producedAmount); assertEquals(BigDecimal("250"), entry.remainingAmount)
             assertEquals(2, repo.snapshot().completions.size)
             assertThrows(IllegalArgumentException::class.java) { repo.delete(entry.copy(producedAmount = BigDecimal.ZERO), "5522") }
-            repo.recordProduction("finish", "product", ProductionLine.BUTTER, day, null, 4L)
+            repo.recordProduction("finish", "product", ProductionLine.BUTTER, day, null, productionTimestamp(day, 4L))
             assertEquals(BigDecimal("1000"), repo.load().single().producedAmount)
         }
     }
@@ -93,7 +93,7 @@ class SharedRowsTest {
         val old = ProductionQueueDatabase(context, null).useDatabase { helper ->
             val repo = ProductionQueueRepository(context, helper as ProductionQueueDatabase)
             repo.save("product", ProductionLine.BUTTER, day, "Masło", "", 1L, BigDecimal("1000"))
-            repo.recordProduction("receipt", "product", ProductionLine.BUTTER, day, BigDecimal("400"), 2L)
+            repo.recordProduction("receipt", "product", ProductionLine.BUTTER, day, BigDecimal("400"), productionTimestamp(day, 2L))
             SharedRows.capture(helper, SharedDomain.PRODUCTION, emptyMap(), actor1, 3L) + ("schema" to 1L)
         }
         val updated = ProductionQueueDatabase(context, null).useDatabase { helper ->
@@ -171,7 +171,7 @@ class SharedRowsTest {
         }
         snapshot = apply(snapshot, actor2) { repo ->
             repo.load().forEach { repo.schedule(it, day, java.time.LocalTime.of(8, 30), 3L) }
-            repo.recordProduction("partial", "MIX", ProductionLine.BUTTER, day, BigDecimal("400"), 4L)
+            repo.recordProduction("partial", "MIX", ProductionLine.BUTTER, day, BigDecimal("400"), productionTimestamp(day, 4L))
             // A repeated flag operation must retain the note, original timestamp and stage.
             val note = repo.snapshot().productNotes.single { it.entryId == "MIX" }
             repo.setProductNoteImportant(note, false)
@@ -194,7 +194,7 @@ class SharedRowsTest {
                 assertEquals(note.entryId == "BUTTER", note.important)
             }
             repo.setProductNoteImportant(state.productNotes.single { it.entryId == "MIX" }, true)
-            repo.recordProduction("finish", "MIX", ProductionLine.BUTTER, day, null, 5L)
+            repo.recordProduction("finish", "MIX", ProductionLine.BUTTER, day, null, productionTimestamp(day, 5L))
         }
         apply(snapshot, actor2) { repo ->
             assertEquals(ButterProductKind.MIX, repo.load().single { it.id == "MIX" }.butterKind)

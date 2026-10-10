@@ -97,7 +97,7 @@ class ProductionQueueUiTest {
                 }
                 val entry = repo.load().single { it.id == "dense-plan-${line.name}-0" }
                 repo.setProductionCode("dense-code-${line.name}", entry, "007", 300L)
-                repo.recordProduction("dense-partial-${line.name}", entry.id, line, today, java.math.BigDecimal("200"), 301L)
+                repo.recordProduction("dense-partial-${line.name}", entry.id, line, today, java.math.BigDecimal("200"), productionTimestamp(today, 301L))
             }
         }
         compose.runOnIdle { model.reload() }
@@ -142,7 +142,7 @@ class ProductionQueueUiTest {
             }
             val entry = repo.load().single { it.id == "long-plan" }
             repo.setProductionCode("long-code", entry, "283", 200L)
-            repo.recordProduction("long-partial", entry.id, entry.line, today, java.math.BigDecimal("123.125"), 201L)
+            repo.recordProduction("long-partial", entry.id, entry.line, today, java.math.BigDecimal("123.125"), productionTimestamp(today, 201L))
         }
         compose.runOnIdle { model.reload() }
         compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading } }

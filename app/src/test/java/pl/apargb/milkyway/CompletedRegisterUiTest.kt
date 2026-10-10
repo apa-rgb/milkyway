@@ -1,5 +1,8 @@
 package pl.apargb.milkyway
 
+import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.inspector.WindowInspector
@@ -27,7 +30,7 @@ import java.time.LocalTime
 class CompletedRegisterUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private lateinit var model: ProductionQueueViewModel
-    private val today get() = LocalDate.now()
+    private val today get() = warehouseProductionDay()
 
     @Before fun clearRegister() {
         model = ViewModelProvider(compose.activity)[ProductionQueueViewModel::class.java]
@@ -56,7 +59,7 @@ class CompletedRegisterUiTest {
     @Test fun rejectedGoodsAcceptDescriptionsAndKilogramsPersistAndOnlyRejectsCanBeDeleted() {
         ProductionQueueRepository(model.getApplication()).useForTest { repository ->
             repository.save("ordinary", ProductionLine.BUTTER, today, "Masło", "Opis", 100L, BigDecimal("1000"))
-            repository.recordProduction("partial", "ordinary", ProductionLine.BUTTER, today, BigDecimal("400"), 200L)
+            repository.recordProduction("partial", "ordinary", ProductionLine.BUTTER, today, BigDecimal("400"), productionTimestamp(today, 200L))
         }
         refresh(); compose.onNodeWithTag("home-Completed").performClick()
         compose.onNodeWithTag("completed-entry-ordinary").assertIsDisplayed()
@@ -104,10 +107,10 @@ class CompletedRegisterUiTest {
         var day = today.minusDays(1)
         ProductionQueueRepository(model.getApplication(), today = { day }).useForTest { repository ->
             repository.save("pin-product", ProductionLine.BUTTER, day, "Masło", "", 100L, BigDecimal("1000"))
-            repository.recordProduction("yesterday", "pin-product", ProductionLine.BUTTER, day, BigDecimal("100"), 101L)
+            repository.recordProduction("yesterday", "pin-product", ProductionLine.BUTTER, day, BigDecimal("100"), productionTimestamp(day, 101L))
             day = today
             repository.schedule(repository.load().single(), day, LocalTime.NOON, 102L)
-            repository.recordProduction("today", "pin-product", ProductionLine.BUTTER, day, BigDecimal("300"), 103L)
+            repository.recordProduction("today", "pin-product", ProductionLine.BUTTER, day, BigDecimal("300"), productionTimestamp(day, 103L))
         }
         refresh(); compose.onNodeWithTag("home-Completed").performClick()
         compose.onNodeWithTag("completed-entry-pin-product").performClick()
@@ -139,12 +142,12 @@ class CompletedRegisterUiTest {
         var executionDay = today.minusDays(1)
         ProductionQueueRepository(model.getApplication(), today = { executionDay }).useForTest { repository ->
             repository.save("two-days", ProductionLine.BUTTER, executionDay, "Masło dzienne", "", 100L, BigDecimal("1000"))
-            repository.recordProduction("first", "two-days", ProductionLine.BUTTER, executionDay, BigDecimal("200"), 101L)
-            repository.recordProduction("second", "two-days", ProductionLine.BUTTER, executionDay, BigDecimal("100"), 102L)
+            repository.recordProduction("first", "two-days", ProductionLine.BUTTER, executionDay, BigDecimal("200"), productionTimestamp(executionDay, 101L))
+            repository.recordProduction("second", "two-days", ProductionLine.BUTTER, executionDay, BigDecimal("100"), productionTimestamp(executionDay, 102L))
             repository.addRejectedGoods("old-reject", ProductionLine.BUTTER, executionDay, "Wczorajszy brak", BigDecimal("5"), 103L)
             executionDay = today
             repository.schedule(repository.load().single(), today, LocalTime.NOON, 200L)
-            repository.recordProduction("third", "two-days", ProductionLine.BUTTER, today, BigDecimal("700"), 201L)
+            repository.recordProduction("third", "two-days", ProductionLine.BUTTER, today, BigDecimal("700"), productionTimestamp(today, 201L))
             repository.addRejectedGoods("new-reject", ProductionLine.BUTTER, today, "Dzisiejszy brak", BigDecimal("10"), 202L)
         }
         refresh(); compose.onNodeWithTag("home-Completed").performClick()
@@ -177,7 +180,7 @@ class CompletedRegisterUiTest {
             repeat(18) { index ->
                 val id = "product-$index"
                 repository.save(id, ProductionLine.BUTTER, today, "Masło partia $index", "", 100L + index, BigDecimal("10"))
-                repository.recordProduction("receipt-$index", id, ProductionLine.BUTTER, today, null, 200L + index)
+                repository.recordProduction("receipt-$index", id, ProductionLine.BUTTER, today, null, productionTimestamp(today, 200L + index))
             }
         }
         refresh(); compose.onNodeWithTag("home-Completed").performClick()
@@ -214,11 +217,11 @@ class CompletedRegisterUiTest {
         var executionDay = today.minusDays(1)
         ProductionQueueRepository(model.getApplication(), today = { executionDay }).useForTest { repository ->
             repository.save("swipe-product", ProductionLine.BUTTER, executionDay, "Masło z dwóch dni", "Opis", 100L, BigDecimal("1000"))
-            repository.recordProduction("old-production", "swipe-product", ProductionLine.BUTTER, executionDay, BigDecimal("300"), 101L)
+            repository.recordProduction("old-production", "swipe-product", ProductionLine.BUTTER, executionDay, BigDecimal("300"), productionTimestamp(executionDay, 101L))
             repository.addRejectedGoods("old-brak", ProductionLine.BUTTER, executionDay, "Wczorajszy brak", BigDecimal("25"), 102L)
             executionDay = today
             repository.schedule(repository.load().single(), today, LocalTime.NOON, 200L)
-            repository.recordProduction("new-production", "swipe-product", ProductionLine.BUTTER, today, BigDecimal("700"), 201L)
+            repository.recordProduction("new-production", "swipe-product", ProductionLine.BUTTER, today, BigDecimal("700"), productionTimestamp(today, 201L))
             repository.addRejectedGoods("new-brak", ProductionLine.BUTTER, today, "Dzisiejszy brak", BigDecimal("10"), 202L)
             repository.addRejectedGoods("next-brak", ProductionLine.UHT, today.plusDays(1), "Brak na następny dzień", BigDecimal("5"), 300L)
         }
@@ -262,7 +265,7 @@ class CompletedRegisterUiTest {
                 Triple("excess", ProductionLine.UHT, "1200")).forEach { (id, line, produced) ->
                 repository.save(id, line, today, when (id) { "partial" -> "Masło częściowe"; "complete" -> "Proszek pełna partia"; else -> "UHT z nadwyżką" },
                     "", 100L, BigDecimal("1000"))
-                repository.recordProduction("receipt-$id", id, line, today, BigDecimal(produced), 200L)
+                repository.recordProduction("receipt-$id", id, line, today, BigDecimal(produced), productionTimestamp(today, 200L))
             }
         }
         refresh()
@@ -288,4 +291,27 @@ class CompletedRegisterUiTest {
     private fun ProductionQueueRepository.useForTest(action: (ProductionQueueRepository) -> Unit) {
         try { action(this) } finally { close() }
     }
+    @Test fun warehouseBeforeNineOpensPreviousProductionDayAndCurrentDayButtonFollowsBoundary() {
+        val day = LocalDate.of(2026, 10, 10)
+        val clock = mutableStateOf(day.plusDays(1).atTime(8, 59).atZone(WarehouseZone).toInstant())
+        val entry = ProductionQueueEntry("night", ProductionLine.BUTTER, day, 0L, "Masło nocne", "", 0L, 0L,
+            BigDecimal("1000"), BigDecimal("400"))
+        val state = ProductionQueueState(entries = listOf(entry), loading = false,
+            completions = listOf(ProductionCompletion("night-receipt", "night", BigDecimal("400"), day, clock.value.toEpochMilli())))
+        compose.activity.setContent {
+            MaterialTheme(colorScheme = MilkywayColors) { ProductionCompletedPage(state, model, clock.value) }
+        }
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(day)))
+        compose.onNodeWithTag("completed-day-window").assertTextEquals("Dzień produkcyjny: 09:00 – 09:00 następnego dnia")
+        compose.onNodeWithTag("completed-amount-night", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 400 kg")
+        compose.onNodeWithTag("completed-today").assertIsNotEnabled()
+        compose.runOnIdle { clock.value = day.plusDays(1).atTime(9, 0).atZone(WarehouseZone).toInstant() }
+        compose.onNodeWithTag("completed-today").assertIsEnabled().performClick()
+        compose.onNodeWithTag("completed-date").assert(hasText(queueDateLabel(day.plusDays(1))))
+        compose.onNodeWithTag("completed-entry-night").assertDoesNotExist()
+        compose.onNodeWithTag("completed-previous-day").performClick()
+        compose.onNodeWithTag("completed-amount-night", useUnmergedTree = true).assertTextEquals("Wyprodukowano: 400 kg")
+        screenshot("magazyn-dzien-produkcyjny-od-9")
+    }
+
 }

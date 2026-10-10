@@ -91,7 +91,7 @@ class NoteRemindersTest {
             repo.addProductNote("n", entry, ProductNoteStage.ORDER, withNoteReminder("Sprawdź opakowanie", NoteReminder(500L)), 2L, "Anna")
             val note = repo.snapshot().productNotes.single()
             repo.schedule(entry, day, java.time.LocalTime.NOON, 3L)
-            repo.recordProduction("receipt", entry.id, entry.line, day, null, 4L)
+            repo.recordProduction("receipt", entry.id, entry.line, day, null, productionTimestamp(day, 4L))
             assertTrue(repo.load().single().completed)
             assertEquals(ProductNoteStage.ORDER, repo.snapshot().productNotes.single { it.id == "n" }.stage)
             val items = productReminderItems(repo.load(), repo.snapshot().productNotes)

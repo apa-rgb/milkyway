@@ -220,7 +220,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
             } else if (section == Section.Announcements) {
                 Box(Modifier.fillMaxSize().padding(padding)) { AnnouncementBoardPage(notes, notesModel) }
             } else if (section == Section.Completed) {
-                Box(Modifier.fillMaxSize().padding(padding)) { ProductionCompletedPage(queue, queueModel) }
+                Box(Modifier.fillMaxSize().padding(padding)) { ProductionCompletedPage(queue, queueModel, java.time.Instant.ofEpochMilli(reminderNow)) }
             } else if (inProduction) {
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     ProductionPage(selectedShift, notesModel, notes, inventory, assumptions, productionModel,
