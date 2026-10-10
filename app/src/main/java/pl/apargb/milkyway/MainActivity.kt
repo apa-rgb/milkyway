@@ -250,38 +250,40 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                         Section.Home -> {
                             item { HomeOverview(null) }
                             item {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("Wybierz zmianę", fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("Wybierz zmianę, na której pracujesz.", style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    (1..3).forEach { shift ->
+                                        ShiftSelectionCard(shift, selectedShift == shift, Modifier.weight(1f).testTag("home-shift-$shift"), compact = true) {
+                                            selectedShift = shift; sectionName = Section.Dashboard.name
+                                        }
+                                    }
                                 }
                             }
                             item {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    HomeProductionAction(Section.Announcements.title, "Ogłoszenia i sprawy do załatwienia", Section.Announcements.icon, Department.Reception,
+                                        Modifier.weight(1.5f).fillMaxHeight().testTag("home-Announcements"), prominent = true) { sectionName = Section.Announcements.name }
                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        (1..3).forEach { shift ->
-                                            ShiftSelectionCard(shift, selectedShift == shift) {
-                                                selectedShift = shift; sectionName = Section.Dashboard.name
-                                            }
-                                        }
-                                    }
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        HomeProductionAction("Produkcja", "Planowanie i kolejka", Icons.Outlined.Factory, Department.Butter,
+                                        HomeProductionAction("Produkcja", "Plan i kolejka", Icons.Outlined.Factory, Department.Butter,
                                             Modifier.testTag("home-Production")) {
                                             productionReturnSection = Section.Home.name
                                             productionDestinationName = ProductionDestination.MENU.name
                                             sectionName = Section.Production.name
                                         }
-                                        HomeProductionAction(Section.Announcements.title, "Ogłoszenia i sprawy do załatwienia", Section.Announcements.icon, Department.Reception,
-                                            Modifier.testTag("home-Announcements")) { sectionName = Section.Announcements.name }
-                                        HomeProductionAction(Section.Completed.title, "Towar gotowy i nadwyżki", Icons.Outlined.Inventory2, Department.Processing,
+                                        HomeProductionAction(Section.Completed.title, "Towar gotowy", Icons.Outlined.Inventory2, Department.Processing,
                                             Modifier.testTag("home-Completed"), compactIcon = true) { sectionName = Section.Completed.name }
-                                        HomeProductionAction(Section.Other.title, "Zbiorniki i wpisy", Section.Other.icon, Department.Powder,
-                                            Modifier.testTag("home-Other")) {
-                                            productionDestinationName = ProductionDestination.OTHER_MENU.name
-                                            sectionName = Section.Other.name
-                                        }
                                     }
+                                }
+                            }
+                            item {
+                                OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).testTag("home-Other"),
+                                    shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Department.Powder.accent.copy(alpha = .25f)),
+                                    onClick = {
+                                        productionDestinationName = ProductionDestination.OTHER_MENU.name
+                                        sectionName = Section.Other.name
+                                    }) {
+                                    Icon(Section.Other.icon, null, Modifier.size(16.dp), tint = Department.Powder.accent)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Inne · Zbiorniki i wpisy", fontSize = 12.sp, color = Department.Powder.accent)
                                 }
                             }
                         }

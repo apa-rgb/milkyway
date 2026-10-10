@@ -14,6 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import androidx.compose.ui.unit.dp
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w411dp-h891dp-xhdpi")
@@ -52,7 +53,29 @@ class WorkFlowUiTest {
         waitForText(body)
     }
 
-    @Test fun choosingShiftOpensPanelAndNotesCanBeEditedCompletedScopedAndRestored() {
+    @Test
+    @Config(qualifiers = "w360dp-h640dp-xhdpi")
+    fun compactHomeKeepsShiftsInOneRowAndProductionAboveWarehouseBesideBoard() {
+        compose.onNodeWithTag("home-app-version", useUnmergedTree = true).assertTextEquals("v${BuildConfig.VERSION_NAME}")
+        val shifts = (1..3).map { compose.onNodeWithTag("home-shift-$it").assertIsDisplayed().getUnclippedBoundsInRoot() }
+        org.junit.Assert.assertTrue(shifts.all { it.top == shifts.first().top && it.bottom - it.top <= 48.dp })
+        org.junit.Assert.assertTrue(shifts.zipWithNext().all { (left, right) -> left.right <= right.left })
+        val journal = compose.onNodeWithTag("home-journal").getUnclippedBoundsInRoot()
+        val version = compose.onNodeWithTag("home-app-version", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue(version.left > (journal.left + journal.right) / 2)
+        org.junit.Assert.assertTrue(version.top < journal.top + 32.dp)
+        val board = compose.onNodeWithTag("home-Announcements").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val production = compose.onNodeWithTag("home-Production").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val warehouse = compose.onNodeWithTag("home-Completed").assertIsDisplayed().getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue(board.right <= production.left && board.right <= warehouse.left)
+        org.junit.Assert.assertEquals(production.left, warehouse.left)
+        org.junit.Assert.assertTrue(production.bottom <= warehouse.top)
+        compose.onNodeWithTag("home-Other").assertIsDisplayed()
+        screenshot("start-home-compact")
+    }
+
+    @Test
+    fun choosingShiftOpensPanelAndNotesCanBeEditedCompletedScopedAndRestored() {
         compose.onNodeWithTag("menu-Tanks").assertDoesNotExist()
         compose.onNodeWithText("Zmiana 1").performClick()
         compose.onNodeWithTag("menu-Notes").assertIsDisplayed()
