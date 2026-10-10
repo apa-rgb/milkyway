@@ -145,7 +145,7 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(noteDate(note.updatedAt), style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(if (note.completed) "Wykonane" else "Dotknij, aby poprawić",
+                                Text(if (note.completed) "Załatwione" else "Dotknij, aby poprawić",
                                     style = MaterialTheme.typography.labelSmall, color = tone.accent)
                             }
                             NoteAuthorLabel(note.author, Modifier.testTag("note-author-${note.id}"))
@@ -175,13 +175,19 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
                            pageTitle: String = kind.title, addLabel: String = kind.addLabel) {
     var body by rememberSaveable { mutableStateOf(initial?.visibleBody?.takeIf { it.isNotBlank() } ?: initial?.title.orEmpty()) }
     var important by rememberSaveable { mutableStateOf(initial?.important ?: false) }
+    var completed by rememberSaveable { mutableStateOf(initial?.completed == true || initial?.reminder?.done == true) }
+    var completedChanged by rememberSaveable { mutableStateOf(false) }
     var reminderMetadata by rememberSaveable { mutableStateOf(initial?.reminder?.let { withNoteReminder("", it) }.orEmpty()) }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     TankFormDialog(if (initial == null) addLabel else "Edytuj wpis", ui.saving, body.isNotBlank(), onClose,
         onSave = { model.save(requestId, id, scope, kind, initial?.title.orEmpty(),
-            withNoteReminder(withImportantText(body, important), noteReminder(reminderMetadata))) }, compact = true,
-        footer = { ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) } }) {
+            withNoteReminder(withImportantText(body, important), noteReminder(reminderMetadata)),
+            completed = if (initial == null || completedChanged) completed else null) }, compact = true,
+        footer = { NoteActionsBar(important, completed, noteReminder(reminderMetadata), !ui.saving,
+            "work-note-important", "work-note-completed", onImportant = { important = it },
+            onCompleted = { completed = it; completedChanged = true },
+            onReminder = { reminderMetadata = withNoteReminder("", NoteReminder(it)); completed = false; completedChanged = true }) }) {
         Column(Modifier.testTag("work-note-editor"), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(if (scope == 0) pageTitle else "$pageTitle · Zmiana $scope", style = MaterialTheme.typography.labelMedium, color = kind.tone().accent)
             NoteAuthorLabel(if (initial == null) currentNoteAuthor() else initial.author, Modifier.testTag("work-note-editor-author"))
@@ -189,10 +195,6 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
                 label = { Text("Treść / notatka", style = MaterialTheme.typography.bodySmall) }, enabled = !ui.saving,
                 modifier = Modifier.fillMaxWidth().testTag("work-note-input"), minLines = 3, maxLines = 6, shape = RoundedCornerShape(20.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(important, { important = it }, enabled = !ui.saving, modifier = Modifier.testTag("work-note-important"))
-                Text("Ważne", style = MaterialTheme.typography.bodySmall, color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
-            }
             Text("Data zapisu uzupełnia się automatycznie.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }

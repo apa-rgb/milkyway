@@ -147,4 +147,41 @@ class ReminderUiTest {
         compose.onNodeWithText("Treść / notatka").assert(hasText("Po powiadomieniu", substring = true))
         compose.onNodeWithTag("home-Production").assertDoesNotExist()
     }
+
+    @Test fun threeBottomActionsKeepTheirStatesAfterRotationAndSaveWithoutAnAlarmWhenDone() {
+        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.onNodeWithTag("menu-Notes").performClick()
+        compose.onNodeWithText("Dodaj notatkę").performClick()
+        compose.onNodeWithText("Treść / notatka").performTextInput("Trzy przyciski w dolnej belce")
+        val important = compose.onNodeWithTag("work-note-important")
+        val reminder = compose.onNodeWithTag("note-reminder")
+        val completed = compose.onNodeWithTag("work-note-completed")
+        listOf(important, reminder, completed).forEach { it.assertIsDisplayed().assertIsOff() }
+        val first = important.getUnclippedBoundsInRoot(); val middle = reminder.getUnclippedBoundsInRoot(); val last = completed.getUnclippedBoundsInRoot()
+        assertEquals(first.top, middle.top); assertEquals(middle.top, last.top)
+        assertTrue(first.right <= middle.left && middle.right <= last.left)
+        assertTrue(first.top >= compose.onNodeWithTag("work-note-input").getUnclippedBoundsInRoot().bottom)
+        important.performClick().assertIsOn()
+        reminder.performClick()
+        compose.onNodeWithTag("form-save-Kiedy przypomnieć?").performClick()
+        reminder.assertIsOn()
+        completed.performClick().assertIsOn()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("work-note-important").assertIsOn()
+        compose.onNodeWithTag("note-reminder").assertIsOn()
+        compose.onNodeWithTag("work-note-completed").assertIsOn()
+        screenshot("notatka-trzy-przyciski")
+        compose.onNodeWithText("Zapisz").performClick()
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && model.state.value.notes.isNotEmpty() } }
+        val note = compose.runOnIdle { model.state.value.notes.single() }
+        assertTrue(note.important); assertTrue(note.completed); assertTrue(note.reminder!!.done)
+        assertEquals("Trzy przyciski w dolnej belce", note.visibleBody)
+        assertFalse(note.reminder!!.due("local", Long.MAX_VALUE))
+        compose.onNodeWithText(note.visibleBody).performClick()
+        compose.onNodeWithTag("work-note-completed").assertIsOn().performClick().assertIsOff()
+        compose.onNodeWithText("Zapisz").performClick()
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.saving && !model.state.value.notes.single().completed } }
+        assertFalse(compose.runOnIdle { model.state.value.notes.single().reminder!!.done })
+    }
+
 }

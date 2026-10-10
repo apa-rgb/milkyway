@@ -59,6 +59,7 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun setProductNoteImportant(note: ProductNote, important: Boolean) = mutate { it.setProductNoteImportant(note, important) }
+    fun setProductNoteCompleted(note: ProductNote, completed: Boolean) = mutate { it.setProductNoteCompleted(note, completed) }
     internal fun scheduleReminder(note: ProductNote, at: Long) {
         val reminder = NoteReminder(at)
         mutate { it.scheduleProductReminder(note, reminder, System.currentTimeMillis()) }

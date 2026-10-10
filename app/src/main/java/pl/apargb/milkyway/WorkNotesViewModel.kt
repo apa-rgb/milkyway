@@ -32,9 +32,9 @@ class WorkNotesViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun clearError() { mutableState.value = mutableState.value.copy(operationError = null) }
 
-    fun save(requestId: String, id: String, scope: Int, kind: NoteKind, title: String, body: String) {
+    fun save(requestId: String, id: String, scope: Int, kind: NoteKind, title: String, body: String, completed: Boolean? = null) {
         val author = CloudSession.get(getApplication()).state.value.noteAuthor
-        mutate(requestId) { it.save(id, scope, kind, title, body, System.currentTimeMillis(), author) }
+        mutate(requestId) { it.save(id, scope, kind, title, body, System.currentTimeMillis(), author, completed) }
     }
     fun setCompleted(note: WorkNote, completed: Boolean) = mutate { it.setCompleted(note, completed, System.currentTimeMillis()) }
     fun delete(note: WorkNote) = mutate { it.delete(note) }

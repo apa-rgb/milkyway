@@ -25,6 +25,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
@@ -57,14 +61,22 @@ internal fun ReminderStatusLabel(reminder: NoteReminder?) {
 }
 
 @Composable
-internal fun ReminderButton(reminder: NoteReminder?, enabled: Boolean, tag: String = "note-reminder", onSelect: (Long) -> Unit) {
+internal fun ReminderButton(reminder: NoteReminder?, enabled: Boolean, tag: String = "note-reminder",
+                            modifier: Modifier = Modifier, compact: Boolean = false, onSelect: (Long) -> Unit) {
     var selecting by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        OutlinedButton(onClick = { selecting = true }, enabled = enabled, modifier = Modifier.testTag(tag)) {
-            Icon(Icons.Outlined.NotificationsActive, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp)); Text("Przypomnienie")
+    val active = selecting || reminder != null
+    Column(modifier.then(if (compact) Modifier else Modifier.fillMaxWidth()), horizontalAlignment = Alignment.CenterHorizontally) {
+        OutlinedButton(onClick = { selecting = true }, enabled = enabled,
+            modifier = Modifier.then(if (compact) Modifier.fillMaxWidth().heightIn(min = 44.dp) else Modifier)
+                .testTag(tag).semantics { toggleableState = if (active) ToggleableState.On else ToggleableState.Off },
+            shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = if (compact) 4.dp else 12.dp, vertical = 8.dp),
+            border = BorderStroke(1.dp, if (active) ReminderActiveColor else MaterialTheme.colorScheme.outlineVariant),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = if (active) ReminderActiveColor.copy(alpha = .13f) else MaterialTheme.colorScheme.surface,
+                contentColor = if (active) ReminderActiveColor else MaterialTheme.colorScheme.onSurfaceVariant)) {
+            if (!compact) { Icon(Icons.Outlined.NotificationsActive, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
+            Text("Przypomnienie", fontSize = if (compact) 11.sp else 14.sp, maxLines = 1)
         }
-        ReminderStatusLabel(reminder)
+        if (!compact) ReminderStatusLabel(reminder)
     }
     if (selecting) ReminderPicker(reminder, onClose = { selecting = false }, onSelect = { onSelect(it); selecting = false })
 }

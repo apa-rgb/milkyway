@@ -39,7 +39,8 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
         buildList { while (cursor.moveToNext()) add(cursor.note()) }
     }
 
-    @Synchronized fun save(id: String, scope: Int, kind: NoteKind, title: String, body: String, now: Long, author: String? = null): List<WorkNote> {
+    @Synchronized fun save(id: String, scope: Int, kind: NoteKind, title: String, body: String, now: Long, author: String? = null,
+                           completed: Boolean? = null): List<WorkNote> {
         require(id.isNotBlank()) { "Brak identyfikatora wpisu." }
         require(scope in 0..3) { "Wybierz zmianę 1, 2 lub 3." }
         require(title.isNotBlank() || noteBody(body).isNotBlank()) { "Wpisz treść notatki." }
@@ -53,10 +54,12 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
             val incoming = noteReminder(body)
             val reminder = if (incoming == null || incoming.token == old?.reminder?.token) old?.reminder ?: incoming
                 else incoming.also { validateReminder(it, now) }
+            val rescheduled = incoming != null && incoming.token != old?.reminder?.token
+            val done = completed ?: if (rescheduled) false else (old?.completed == true || reminder?.done == true)
             val values = ContentValues().apply {
                 put("id", id); put("scope", scope); put("kind", kind.name)
-                put("title", title.trim()); put("body", withNoteReminder(withNoteAuthor(body, if (old == null) author else old.author), reminder))
-                put("completed", if (old?.completed == true && kind == NoteKind.REMINDER && reminder?.token == old.reminder?.token) 1 else 0)
+                put("title", title.trim()); put("body", withNoteReminder(withNoteAuthor(body, if (old == null) author else old.author), reminder?.copy(done = done)))
+                put("completed", if (done) 1 else 0)
                 put("created_at", old?.createdAt ?: now); put("updated_at", now)
             }
             if (old == null) db.insertOrThrow("work_notes", null, values)
@@ -67,7 +70,6 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
     }
 
     @Synchronized fun setCompleted(note: WorkNote, completed: Boolean, now: Long): List<WorkNote> {
-        require(note.kind == NoteKind.REMINDER) { "Stan wykonania dotyczy przypomnień." }
         val current = currentNote(note)
         val values = ContentValues().apply {
             put("completed", if (completed) 1 else 0); put("updated_at", now)
@@ -97,8 +99,8 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
             val current = currentNote(note)
             val values = ContentValues().apply {
                 put("body", change(current)); put("updated_at", now)
-                if (complete && current.kind == NoteKind.REMINDER) put("completed", 1)
-                if (resetComplete && current.kind == NoteKind.REMINDER) put("completed", 0)
+                if (complete) put("completed", 1)
+                if (resetComplete) put("completed", 0)
             }
             db.update("work_notes", values, "id = ?", arrayOf(current.id))
             db.setTransactionSuccessful()

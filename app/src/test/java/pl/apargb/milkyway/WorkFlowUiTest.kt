@@ -77,7 +77,7 @@ class WorkFlowUiTest {
         waitForText("Uzupełniona notatka")
         val checkBox = hasAnyAncestor(hasText("Uzupełniona notatka")) and isToggleable()
         compose.onNode(checkBox).performClick()
-        compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithText("Wykonane").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithText("Załatwione").fetchSemanticsNodes().isNotEmpty() }
         compose.activityRule.scenario.recreate()
         compose.onNode(checkBox).assertIsOn()
         screenshot("przypomnienia-edycja")
@@ -160,9 +160,9 @@ class WorkFlowUiTest {
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
         compose.onNodeWithText("Treść / notatka").performTextInput("Sprawdzić parametry przed produkcją")
-        compose.onNodeWithTag("work-note-important").performScrollTo().performClick()
+        compose.onNodeWithTag("work-note-important").performClick()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithTag("work-note-important").performScrollTo().assertIsOn()
+        compose.onNodeWithTag("work-note-important").assertIsOn()
         screenshot("notatka-formularz")
         compose.onNodeWithText("Zapisz").performClick()
         waitForText("Sprawdzić parametry przed produkcją")
@@ -171,7 +171,7 @@ class WorkFlowUiTest {
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Sprawdzić parametry przed produkcją").performClick()
         compose.onNodeWithText("Treść / notatka").assert(hasText("Sprawdzić parametry przed produkcją", substring = true))
-        compose.onNodeWithTag("work-note-important").performScrollTo().assertIsOn().performClick()
+        compose.onNodeWithTag("work-note-important").assertIsOn().performClick()
         compose.onNodeWithText("Zapisz").performClick()
         waitForText("Sprawdzić parametry przed produkcją")
         val model = ViewModelProvider(compose.activity)[WorkNotesViewModel::class.java]

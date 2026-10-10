@@ -17,13 +17,16 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                                 model: ProductionQueueViewModel, onClose: () -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     var important by rememberSaveable { mutableStateOf(false) }
+    var completed by rememberSaveable { mutableStateOf(false) }
     var reminderMetadata by rememberSaveable { mutableStateOf("") }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     val notes = ui.productNotes.filter { it.entryId == entry.id }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     TankFormDialog("Notatki produktu", saving = ui.saving, canSave = text.isNotBlank(), onClose = onClose, compact = true,
-        onSave = { model.addProductNote(requestId, entry, stage, withNoteReminder(withImportantText(text, important), noteReminder(reminderMetadata))) },
-        footer = { ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) } }, content = {
+        onSave = { model.addProductNote(requestId, entry, stage, withCompletedText(withNoteReminder(withImportantText(text, important), noteReminder(reminderMetadata)), completed)) },
+        footer = { NoteActionsBar(important, completed, noteReminder(reminderMetadata), !ui.saving,
+            "product-note-important", "product-note-completed", onImportant = { important = it }, onCompleted = { completed = it },
+            onReminder = { reminderMetadata = withNoteReminder("", NoteReminder(it)); completed = false }) }, content = {
             Column(Modifier.testTag("product-notes-dialog"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(entry.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
                 Text("${entry.line.title} · ${stage.title}", style = MaterialTheme.typography.bodySmall)
@@ -32,10 +35,6 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                     modifier = Modifier.fillMaxWidth().testTag("product-note-input"), minLines = 3, maxLines = 5, enabled = !ui.saving,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface),
                     shape = RoundedCornerShape(20.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(important, { important = it }, enabled = !ui.saving, modifier = Modifier.testTag("product-note-important"))
-                    Text("Ważne", color = if (important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
-                }
                 Text("Notatka zostanie dopisana do historii produktu wraz z datą i etapem.", style = MaterialTheme.typography.bodySmall)
                 ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 HorizontalDivider()
@@ -57,6 +56,12 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                                     modifier = Modifier.testTag("product-note-important-${note.id}"))
                                 Text("Ważne", style = MaterialTheme.typography.labelSmall,
                                     color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (!note.isProductionCode()) Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(note.completed, { model.setProductNoteCompleted(note, it) }, enabled = !ui.saving,
+                                    modifier = Modifier.testTag("product-note-completed-${note.id}"))
+                                Text("Załatwione", style = MaterialTheme.typography.labelSmall,
+                                    color = if (note.completed) CompletedNoteColor else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(note.visibleText, modifier = Modifier.testTag("product-note-${note.id}"),
                                 style = MaterialTheme.typography.bodyMedium,

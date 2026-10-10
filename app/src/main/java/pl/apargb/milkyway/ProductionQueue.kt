@@ -400,8 +400,11 @@ internal class ProductionQueueRepository(context: Context,
 
     @Synchronized fun scheduleProductReminder(note: ProductNote, reminder: NoteReminder, now: Long): List<ProductionQueueEntry> {
         validateReminder(reminder, now)
-        return changeProductReminder(note) { withNoteReminder(it, reminder) }
+        return changeProductReminder(note) { withNoteReminder(withCompletedText(it, false), reminder) }
     }
+
+    @Synchronized fun setProductNoteCompleted(note: ProductNote, completed: Boolean): List<ProductionQueueEntry> =
+        changeProductReminder(note) { withCompletedText(it, completed) }
 
     @Synchronized fun actProductReminder(note: ProductNote, token: String, action: ReminderAction, reader: String): List<ProductionQueueEntry> =
         changeProductReminder(note) { changedReminderText(it, token, action, reader) }

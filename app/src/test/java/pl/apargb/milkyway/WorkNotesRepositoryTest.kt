@@ -86,7 +86,7 @@ class WorkNotesRepositoryTest {
         assertEquals(listOf("b"), repository.load().map { it.id })
     }
 
-    @Test fun invalidEntriesDoNotOverwriteExistingDataAndOnlyRemindersCanBeCompleted() {
+    @Test fun invalidEntriesDoNotOverwriteExistingData() {
         repository.save("a", 1, NoteKind.AIR_CONDITIONING, "Pomiar", "4 °C", 100L)
         val before = repository.load()
         listOf(" ", "x".repeat(121)).forEach { title ->
@@ -100,7 +100,6 @@ class WorkNotesRepositoryTest {
         assertThrows(IllegalArgumentException::class.java) {
             repository.save("a", 1, NoteKind.AIR_CONDITIONING, "A", "x".repeat(10001), 200L)
         }
-        assertThrows(IllegalArgumentException::class.java) { repository.setCompleted(before.single(), true, 200L) }
         assertEquals(before, repository.load())
     }
 
@@ -117,4 +116,34 @@ class WorkNotesRepositoryTest {
         assertNull(repository.load().single { it.id == "legacy" }.author)
         assertEquals(1L, repository.load().single { it.id == "new" }.createdAt)
     }
+
+    @Test fun completedStateSavesWithEveryKindAndStaleEditsPreserveIt() {
+        NoteKind.entries.forEach { kind ->
+            repository.save(kind.name, 1, kind, "", "Opis", 1L, "Anna", completed = true)
+            val original = repository.load().single { it.id == kind.name }
+            assertTrue(original.completed)
+            repository.save(kind.name, 1, kind, "", "Poprawiony opis", 2L, "Piotr")
+            val edited = repository.load().single { it.id == kind.name }
+            assertTrue(edited.completed); assertEquals("Anna", edited.author); assertEquals(1L, edited.createdAt)
+            repository.save(kind.name, 1, kind, "", "Ponownie otwarte", 3L, completed = false)
+            assertFalse(repository.load().single { it.id == kind.name }.completed)
+        }
+        repository.close(); repository = WorkNotesRepository(context)
+        assertTrue(repository.load().all { !it.completed })
+    }
+
+    @Test fun completedAtCreationSuppressesReminderAndNewScheduleReopensAnyNote() {
+        val reminder = NoteReminder(500L)
+        repository.save("done", 1, NoteKind.CURRENT_NOTES, "", withNoteReminder("Opis", reminder), 1L,
+            "Anna", completed = true)
+        val note = repository.load().single()
+        assertTrue(note.completed); assertTrue(note.reminder!!.done)
+        assertFalse(workReminderItems(listOf(note)).single().reminder.due("01", 600L))
+        repository.save("done", 1, NoteKind.CURRENT_NOTES, "", note.body, 2L)
+        assertTrue(repository.load().single().completed)
+        repository.scheduleReminder(note, NoteReminder(800L), 600L)
+        assertFalse(repository.load().single().completed); assertFalse(repository.load().single().reminder!!.done)
+        assertTrue(repository.load().single().reminder!!.due("01", 900L))
+    }
+
 }

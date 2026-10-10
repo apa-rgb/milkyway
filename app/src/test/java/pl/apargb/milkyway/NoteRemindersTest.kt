@@ -116,4 +116,34 @@ class NoteRemindersTest {
         assertEquals("2026-12-31T23:15:00Z", java.time.Instant.ofEpochMilli(at).toString())
         assertThrows(IllegalArgumentException::class.java) { reminderMoment(LocalDate.of(2027, 1, 1), "00:15", zone, at) }
     }
+
+    @Test fun productNoteCompletionWithoutReminderSurvivesAnnotationsAndSharedRestore() {
+        val text = withCompletedText(withNoteAuthor(withImportantText("Treść", true), "Anna"), true)
+        assertEquals("Treść", noteBody(text)); assertTrue(isCompletedText(text)); assertTrue(isImportantText(text))
+        assertEquals("Anna", noteAuthor(text))
+        val changed = withImportantText(text, false)
+        assertTrue(isCompletedText(changed)); assertEquals("Treść", noteBody(changed))
+        val reminder = NoteReminder(500L, readBy = setOf("01"))
+        val withReminder = withCompletedText(withNoteReminder(changed, reminder), true)
+        assertTrue(noteReminder(withReminder)!!.done)
+        assertFalse(isCompletedText(withCompletedText(withReminder, false)))
+        assertEquals(setOf("01"), noteReminder(withCompletedText(withReminder, false))!!.readBy)
+        val db = ProductionQueueDatabase(context, null)
+        try {
+            val repo = ProductionQueueRepository(context, db)
+            repo.save("order", ProductionLine.UHT, LocalDate.of(2026, 10, 10), "Produkt", "", 1L, pendingOrder = true)
+            repo.addProductNote("done-note", repo.load().single(), ProductNoteStage.ORDER, text, 2L, author = "Anna")
+            val snapshot = SharedRows.capture(db, SharedDomain.PRODUCTION, emptyMap(), mapOf("uid" to "user1", "account" to "01"), 3L)
+            ProductionQueueDatabase(context, null).withDatabase { second ->
+                SharedRows.restore(second, SharedDomain.PRODUCTION, snapshot)
+                val restored = ProductionQueueRepository(context, second)
+                val note = restored.snapshot().productNotes.single()
+                assertTrue(note.completed); assertEquals("Anna", note.author); assertEquals("Treść", note.visibleText)
+                restored.setProductNoteCompleted(note, false)
+                assertFalse(restored.snapshot().productNotes.single().completed)
+                assertTrue(restored.snapshot().productNotes.single().important)
+            }
+        } finally { db.close() }
+    }
+
 }

@@ -48,7 +48,7 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithText("Przypomnienie zmiany").assertDoesNotExist()
         compose.onNodeWithTag("announcements-add").performClick()
         compose.onNodeWithText("Treść / notatka").performTextInput("Przegląd instalacji rano")
-        compose.onNodeWithTag("work-note-important").performScrollTo().performClick()
+        compose.onNodeWithTag("work-note-important").performClick()
         compose.onNodeWithText("Zapisz").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("announcement-status-yesterday").fetchSemanticsNodes().isEmpty() &&
             compose.onAllNodesWithTag("work-note-editor").fetchSemanticsNodes().isEmpty() &&

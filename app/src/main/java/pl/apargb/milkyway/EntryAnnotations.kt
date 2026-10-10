@@ -31,18 +31,26 @@ internal fun noteReminder(text: String): NoteReminder? = reminderPattern.find(wi
     if (readers.any { it !in reminderReaders }) return@let null
     NoteReminder(at, match.groupValues[2], readers, match.groupValues[4] == "1")
 }
-internal fun noteBody(text: String): String = withoutAuthor(text).let { body ->
+private fun withoutReminder(text: String): String = withoutAuthor(text).let { body ->
     if (noteReminder(text) != null) body.removeRange(reminderPattern.find(body)!!.range) else body
 }
-private fun annotatedNote(text: String, important: Boolean, author: String?, reminder: NoteReminder?): String = listOfNotNull(
+private const val COMPLETED_MARKER = "[Załatwione]"
+internal fun isCompletedText(text: String) = withoutReminder(text).let { it == COMPLETED_MARKER || it.startsWith("$COMPLETED_MARKER\n") }
+internal fun noteBody(text: String): String = withoutReminder(text).let {
+    if (isCompletedText(text)) it.removePrefix(COMPLETED_MARKER).removePrefix("\n") else it
+}
+private fun annotatedNote(text: String, important: Boolean, author: String?, reminder: NoteReminder?, completed: Boolean): String = listOfNotNull(
     IMPORTANT_MARKER.takeIf { important },
     author?.let(::normalizeOperatorName)?.takeIf { it.isNotBlank() }?.let { "[Autor: $it]" },
     reminder?.let { "[Przypomnienie: ${it.at}|${it.token}|${it.readBy.sorted().joinToString(",")}|${if (it.done) 1 else 0}]" },
+    COMPLETED_MARKER.takeIf { completed },
     text.trim().takeIf { it.isNotEmpty() }
 ).joinToString("\n")
-internal fun withImportantText(text: String, important: Boolean) = annotatedNote(noteBody(text), important, noteAuthor(text), noteReminder(text))
-internal fun withNoteAuthor(text: String, author: String?) = annotatedNote(noteBody(text), isImportantText(text), author, noteReminder(text))
-internal fun withNoteReminder(text: String, reminder: NoteReminder?) = annotatedNote(noteBody(text), isImportantText(text), noteAuthor(text), reminder)
+internal fun withImportantText(text: String, important: Boolean) = annotatedNote(noteBody(text), important, noteAuthor(text), noteReminder(text), isCompletedText(text))
+internal fun withNoteAuthor(text: String, author: String?) = annotatedNote(noteBody(text), isImportantText(text), author, noteReminder(text), isCompletedText(text))
+internal fun withNoteReminder(text: String, reminder: NoteReminder?) = annotatedNote(noteBody(text), isImportantText(text), noteAuthor(text), reminder, isCompletedText(text))
+internal fun withCompletedText(text: String, completed: Boolean) = annotatedNote(noteBody(text), isImportantText(text), noteAuthor(text), noteReminder(text)?.copy(done = completed), completed)
+internal val ProductNote.completed get() = isCompletedText(text) || reminder?.done == true
 internal val ProductNote.important get() = isImportantText(text)
 internal val ProductNote.visibleText get() = noteBody(text)
 internal val ProductNote.author get() = noteAuthor(text)
