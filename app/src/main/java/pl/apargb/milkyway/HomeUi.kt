@@ -132,6 +132,22 @@ internal fun HomeProductionAction(title: String, caption: String, icon: ImageVec
 }
 
 @Composable
+internal fun HomeDocumentationAction(onClick: () -> Unit) {
+    val tone = Department.Reception
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("home-Documentation"),
+        shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, tone.accent.copy(alpha = .25f)),
+        colors = CardDefaults.cardColors(containerColor = tone.tint.copy(alpha = .5f))) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Outlined.FolderOpen, null, Modifier.size(22.dp), tint = tone.accent)
+            Text("Dokumentacja produkcji", Modifier.weight(1f), fontSize = 13.sp, lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold, color = tone.accent)
+            Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(16.dp), tint = tone.accent)
+        }
+    }
+}
+
+@Composable
 internal fun DashboardTile(title: String, caption: String, icon: ImageVector, tone: Department,
                            modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(16.dp),

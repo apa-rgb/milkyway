@@ -70,8 +70,16 @@ class WorkFlowUiTest {
         org.junit.Assert.assertTrue(board.right <= production.left && board.right <= warehouse.left)
         org.junit.Assert.assertEquals(production.left, warehouse.left)
         org.junit.Assert.assertTrue(production.bottom <= warehouse.top)
+        compose.onNodeWithTag("home-Documentation").assertIsDisplayed()
         compose.onNodeWithTag("home-Other").assertIsDisplayed()
         screenshot("start-home-compact")
+        compose.onNodeWithTag("home-Documentation").performClick()
+        compose.onNodeWithTag("production-documentation-page").assertIsDisplayed()
+        compose.onNodeWithText("Dokumentacja produkcji").assertIsDisplayed()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("production-documentation-page").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Wróć do ekranu głównego").performClick()
+        compose.onNodeWithTag("home-Documentation").assertIsDisplayed()
     }
 
     @Test

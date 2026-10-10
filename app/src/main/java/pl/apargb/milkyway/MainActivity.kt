@@ -70,6 +70,7 @@ private enum class Section(val title: String, val icon: ImageVector) {
     Production("Produkcja", Icons.Outlined.Factory),
     Announcements("Tablica ogłoszeń", Icons.Outlined.Campaign),
     Other("Inne", Icons.Outlined.Apps),
+    Documentation("Dokumentacja produkcji", Icons.Outlined.FolderOpen),
     Completed(WAREHOUSE_TITLE, Icons.Outlined.Inventory2),
     Controls("Kontrola parametrów", Icons.Outlined.Tune)
 }
@@ -153,7 +154,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         else if (section == Section.Controls && controlKind != null) controlName = null
         else sectionName = when (section) {
             Section.Production -> productionReturnSection
-            Section.Announcements, Section.Other, Section.Completed, Section.Dashboard -> Section.Home.name
+            Section.Announcements, Section.Other, Section.Completed, Section.Documentation, Section.Dashboard -> Section.Home.name
             else -> Section.Dashboard.name
         }
     }
@@ -183,7 +184,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                         inProduction && productionDestination.parent == ProductionDestination.MENU -> "Wróć do produkcji"
                         inProduction && productionDestination.parent == ProductionDestination.OTHER_MENU -> "Wróć do innych"
                         section == Section.Controls && controlKind != null -> "Wróć do kontroli parametrów"
-                        section == Section.Announcements || section == Section.Other || section == Section.Completed || section == Section.Production && productionReturnSection == Section.Home.name -> "Wróć do ekranu głównego"
+                        section == Section.Announcements || section == Section.Other || section == Section.Completed || section == Section.Documentation || section == Section.Production && productionReturnSection == Section.Home.name -> "Wróć do ekranu głównego"
                         else -> "Wróć do panelu zmiany"
                     })
                 }
@@ -277,6 +278,9 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                                 }
                             }
                             item {
+                                HomeDocumentationAction { sectionName = Section.Documentation.name }
+                            }
+                            item {
                                 OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).testTag("home-Other"),
                                     shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Department.Powder.accent.copy(alpha = .25f)),
                                     onClick = {
@@ -290,6 +294,11 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                             }
                         }
                         Section.Tanks -> Unit
+                        Section.Documentation -> item {
+                            Box(Modifier.testTag("production-documentation-page")) {
+                                EmptyCard("Brak dokumentów", "Dokumentacja produkcji pojawi się tutaj po dodaniu materiałów.", Section.Documentation.icon)
+                            }
+                        }
                         Section.Softlab -> item {
                             val description = AppContent.softlabDescription
                             if (description.isNullOrBlank()) {

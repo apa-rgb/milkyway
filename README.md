@@ -1,6 +1,6 @@
 # Milkyway — aplikacja Android
 
-Wersja **0.7.20** zapisuje nową produkcję w Magazyn/Wyprodukowano według dnia produkcyjnego od 09:00 do 09:00 następnego dnia (czas polski, Europe/Warsaw). Wpisy przed 09:00 należą do dnia poprzedniego, od 09:00 do nowego. Magazyn domyślnie otwiera trwający dzień produkcyjny i pokazuje zakres godzin. Do 09:00 można potwierdzać również produkcję z kolejki poprzedniego dnia. Dokładne daty i godziny wykonania oraz dotychczasowe zapisane dni pozostają w historii.
+Wersja **0.7.21** dodaje na głównym ekranie kompaktowy kafelek „Dokumentacja produkcji” z ikoną folderu. Otwiera osobny ekran przygotowany na przyszłe materiały; na razie wyświetla informację o braku dokumentów. Powrót prowadzi do ekranu głównego, a otwarta sekcja pozostaje wybrana po obrocie telefonu.
 
 Wersja **0.7.17** wzmacnia czcionki i kontrast opisów, ilości oraz parametrów zbiorników. Olej ma termin ważności o **12:00 wskazanego dnia**. Intensywnie bordowy wiersz i karta szczegółów z jasnym tekstem pojawiają się **dzień wcześniej po 12:00** i pozostają po upływie terminu. W aplikacji widoczna jest wyłącznie data ważności, bez godziny. Reguła opiera się na lokalnym kalendarzu telefonu, także przy zmianie czasu. Puste zbiorniki nie są oznaczane alarmem. Dotychczasowy delikatnie czerwony kolor przy mniej niż trzech dniach ważności pozostaje dostępny. Kolor odświeża się wraz z czasem, bez ponownego wejścia na ekran.
 
