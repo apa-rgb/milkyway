@@ -207,7 +207,8 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                         onEdit = { openEditor(it, TankEditor.STATE) },
                         onOilType = { inventoryModel.clearError(); oilTypeTankId = it.id },
                         onRouting = { inventoryModel.clearError(); routingTankId = it.id }, onRetry = inventoryModel::reload,
-                        onReset = { inventoryModel.clearError(); resetTankId = it.id }, today = java.time.Instant.ofEpochMilli(reminderNow).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+                        onReset = { inventoryModel.clearError(); resetTankId = it.id }, today = java.time.Instant.ofEpochMilli(reminderNow).atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                        now = java.time.Instant.ofEpochMilli(reminderNow))
                 }
             } else if (section == Section.Laboratory) {
                 Box(Modifier.fillMaxSize().padding(padding)) {
@@ -324,7 +325,8 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                 onTopUps = { inventoryModel.showTopUps(tank.id) },
                 onRouting = { inventoryModel.clearError(); routingTankId = tank.id },
                 onOilType = { inventoryModel.clearError(); oilTypeTankId = tank.id },
-                today = java.time.Instant.ofEpochMilli(reminderNow).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+                today = java.time.Instant.ofEpochMilli(reminderNow).atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                now = java.time.Instant.ofEpochMilli(reminderNow))
         }
     }
     AppContent.tanks.find { it.id == editorTankId }?.let { tank ->

@@ -94,12 +94,13 @@ fun LaboratoryPage(ui: InventoryUiState, model: InventoryViewModel, shift: Int, 
                                     Text(tank.name, fontWeight = FontWeight.Bold, color = department.accent)
                                     status.laboratoryMeasuredAt?.let { LaboratoryBadge(it, Modifier.testTag("lab-list-marker-${tank.id}")) }
                                 }
-                                Text(status.litres?.let { "Stan: ${decimalLabel(it)} l" } ?: "Stan nieustalony", style = MaterialTheme.typography.bodySmall)
+                                Text(status.litres?.let { "Stan: ${decimalLabel(it)} l" } ?: "Stan nieustalony", style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold)
                                 val first = if (tank.usesFatMeasurement) "Tłuszcz: ${status.measurements.fatPercent?.let(::decimalLabel) ?: "—"} %"
                                     else "Brix: ${status.measurements.brix?.let(::decimalLabel) ?: "—"} °Bx"
-                                if (!tank.isOilTank) Text(first, style = MaterialTheme.typography.bodySmall)
+                                if (!tank.isOilTank) Text(first, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                                 Text((if (tank.isOilTank) "" else "pH: ${status.measurements.ph?.let(::decimalLabel) ?: "—"} · SH: ${status.measurements.sh?.let(::decimalLabel) ?: "—"} · ") + "Temp.: ${status.measurements.temperature?.let(::decimalLabel) ?: "—"} °C",
-                                    style = MaterialTheme.typography.bodySmall)
+                                    style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }

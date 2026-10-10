@@ -16,6 +16,9 @@ import java.util.UUID
 
 internal val OilWarningColor = Color(0xFFB3261E)
 internal val OilWarningBackground = Color(0xFFFFE5E3)
+internal val OilUrgentBackground = Color(0xFF7D163F)
+internal val OilUrgentOutline = Color(0xFFA62754)
+internal val OilUrgentSecondary = Color(0xFFF9E3EB)
 internal fun LocalDate?.oilDateLabel(): String = this?.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) ?: "—"
 
 @Composable

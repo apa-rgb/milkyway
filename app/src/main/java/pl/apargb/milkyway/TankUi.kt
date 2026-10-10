@@ -40,24 +40,29 @@ enum class TankEditor { STATE, RECEIVE, TRANSFER }
 fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
                   onEdit: () -> Unit, onReceive: () -> Unit, onTransfer: () -> Unit, onHistory: () -> Unit,
                   onRouting: () -> Unit, onOilType: () -> Unit, onTopUps: () -> Unit,
-                  today: java.time.LocalDate = java.time.LocalDate.now()) {
+                  today: java.time.LocalDate = java.time.LocalDate.now(), now: Instant = Instant.now()) {
     val department = tank.department
     val litres = status.litres
     val capacity = tank.capacityLitres?.let(BigDecimal::valueOf)
     val expiryWarning = tank.isOilTank && status.oilExpiresSoon(today)
+    val urgent = tank.isOilTank && status.oilExpiresWithinDay(now, ZoneId.systemDefault())
+    val mainColor = if (urgent) Color.White else MaterialTheme.colorScheme.onSurface
+    val secondaryColor = if (urgent) OilUrgentSecondary else MaterialTheme.colorScheme.onSurface
+    val accent = if (urgent) Color.White else department.accent
     Card(Modifier.fillMaxWidth().testTag("tank-${tank.id}"), shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = if (expiryWarning) OilWarningBackground else MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, if (expiryWarning) OilWarningColor else department.accent.copy(alpha = 0.35f)),
+        colors = CardDefaults.cardColors(containerColor = if (urgent) OilUrgentBackground else if (expiryWarning) OilWarningBackground else MaterialTheme.colorScheme.surface,
+            contentColor = mainColor),
+        border = BorderStroke(1.dp, if (urgent) OilUrgentOutline else if (expiryWarning) OilWarningColor else department.accent.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
         Box(Modifier.fillMaxWidth().height(4.dp).background(department.accent))
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tank.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(tank.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
                 DepartmentBadge(department)
             }
             Text("Opis zbiornika: ${tank.description}", style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                fontWeight = FontWeight.Medium, color = secondaryColor)
             if (tank.isOilTank) AssistChip(onClick = onOilType,
                 label = { Text("Rodzaj oleju: ${status.oilType.ifBlank { "niepodany" }}") },
                 colors = AssistChipDefaults.assistChipColors(containerColor = department.tint, labelColor = department.accent))
@@ -74,13 +79,15 @@ fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
                         Modifier.fillMaxWidth().testTag("detail-quantity-${tank.id}")
                             .clickable(role = Role.Button, onClickLabel = "Edytuj ilość: ${tank.name}", onClick = onEdit),
                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = department.accent)
-                    Text("Pojemność: ${capacityLabel(tank.capacityLitres)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Pojemność: ${capacityLabel(tank.capacityLitres)}", style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     if (litres != null && capacity != null && capacity.signum() > 0) {
                         val fraction = litres.divide(capacity, 6, RoundingMode.HALF_UP).toFloat().coerceIn(0f, 1f)
                         LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth(),
                             color = department.accent, trackColor = department.accent.copy(alpha = 0.12f))
                         Text("Napełnienie: ${decimalLabel(litres.multiply(BigDecimal("100")).divide(capacity, 1, RoundingMode.HALF_UP))}% · Wolne: ${decimalLabel(capacity - litres)} l",
-                            style = MaterialTheme.typography.bodySmall)
+                            style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -90,41 +97,46 @@ fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
                 litres == null -> "nieustalona"
                 else -> "niepodana"
             }, fontWeight = FontWeight.SemiBold,
-                color = if (litres?.signum() == 0) EmptyTankColor else MaterialTheme.colorScheme.onSurface)
+                color = if (litres?.signum() == 0) EmptyTankColor else mainColor)
             MeasurementTiles(status.measurements, tank.usesFatMeasurement, tank.isOilTank)
             if (tank.isOilTank) {
-                Text("Data produkcji: ${status.oilBatch.producedOn.oilDateLabel()}", modifier = Modifier.clickable(onClick = onOilType))
-                Text("Data ważności: ${status.oilBatch.expiresOn.oilDateLabel()}", modifier = Modifier.clickable(onClick = onOilType),
-                    color = if (expiryWarning) OilWarningColor else MaterialTheme.colorScheme.onSurface)
-                if (expiryWarning) Text("Uwaga: termin ważności za mniej niż 3 dni lub już minął.", color = OilWarningColor,
-                    style = MaterialTheme.typography.bodySmall)
+                Text("Data produkcji: ${status.oilBatch.producedOn.oilDateLabel()}", modifier = Modifier.clickable(onClick = onOilType),
+                    fontWeight = FontWeight.SemiBold)
+                Text("Data ważności: ${status.oilBatch.expiresOn.oilDateLabel()}",
+                    modifier = Modifier.testTag("detail-oil-expiry-${tank.id}").clickable(onClick = onOilType),
+                    fontWeight = FontWeight.Bold, color = if (urgent) Color.White else if (expiryWarning) OilWarningColor else mainColor)
+                if (expiryWarning) Text(if (urgent) "Uwaga: ostatnia doba ważności lub termin już minął."
+                    else "Uwaga: termin ważności za mniej niż 3 dni.", color = if (urgent) Color.White else OilWarningColor,
+                    fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
             }
             status.laboratoryMeasuredAt?.let {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LaboratoryBadge(it, Modifier.testTag("detail-lab-marker-${tank.id}"))
-                    Text("Laboratorium: ${dateLabel(it)}", style = MaterialTheme.typography.bodySmall, color = EmptyTankColor)
+                    Text("Laboratorium: ${dateLabel(it)}", style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium, color = if (urgent) secondaryColor else EmptyTankColor)
                 }
             }
-            Text("Ostatnie napełnienie: ${status.filledAt?.let(::dateLabel) ?: "—"}", style = MaterialTheme.typography.bodySmall)
+            Text("Ostatnie napełnienie: ${status.filledAt?.let(::dateLabel) ?: "—"}", style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold)
             if (latest != null) {
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Ostatnia operacja", style = MaterialTheme.typography.labelMedium, color = department.accent)
-                    Text(movementDescription(latest), style = MaterialTheme.typography.bodySmall)
+                    Text("Ostatnia operacja", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = accent)
+                    Text(movementDescription(latest), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                     Text(dateLabel(latest.occurredAt), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        fontWeight = FontWeight.Medium, color = secondaryColor)
                 }
             }
             if (litres == null) Text("Dotknij stanu, aby wpisać ilość w m³. Dla pustego zbiornika wpisz 0.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedButton(onClick = onReceive, enabled = litres != null,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = department.accent), modifier = Modifier.fillMaxWidth()) {
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = accent), modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.Add, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (litres != null && litres.signum() > 0) "Dolej materiał" else "Napełnij")
             }
             TextButton(onClick = onTopUps, modifier = Modifier.fillMaxWidth().testTag("top-ups-${tank.id}"),
-                colors = ButtonDefaults.textButtonColors(contentColor = department.accent)) {
+                colors = ButtonDefaults.textButtonColors(contentColor = accent)) {
                 Icon(Icons.Outlined.History, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Wszystkie dolania")
@@ -133,7 +145,7 @@ fun TankStockCard(tank: Tank, status: TankStatus, latest: Movement?,
                 Button(onClick = onTransfer, enabled = litres != null && litres.signum() > 0,
                     colors = ButtonDefaults.buttonColors(containerColor = department.accent, contentColor = Color.White),
                     modifier = Modifier.weight(1f)) { Text("Przenieś materiał") }
-                TextButton(onClick = onHistory, colors = ButtonDefaults.textButtonColors(contentColor = department.accent),
+                TextButton(onClick = onHistory, colors = ButtonDefaults.textButtonColors(contentColor = accent),
                     modifier = Modifier.weight(1f)) { Text("Historia") }
             }
         }
@@ -153,8 +165,10 @@ private fun MeasurementTiles(values: Measurements, usesFat: Boolean, oil: Boolea
                 row.forEach { (label, value) ->
                     Surface(Modifier.weight(1f), color = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(12.dp)) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface)
+                            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
@@ -173,10 +187,10 @@ internal fun MeasurementSummary(values: Measurements, usesFat: Boolean, oil: Boo
             "Brix: ${value(values.brix, " °Bx")}"
         }
         if (!oil) Text("$mainMeasurement · pH: ${value(values.ph)} · SH: ${value(values.sh)}",
-            style = MaterialTheme.typography.bodyMedium)
+            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         if (!oil && usesFat && values.brix != null) Text("Wcześniejszy pomiar Brix: ${value(values.brix, " °Bx")}",
             style = MaterialTheme.typography.bodySmall)
-        Text("Temperatura: ${value(values.temperature, " °C")}", style = MaterialTheme.typography.bodyMedium)
+        Text("Temperatura: ${value(values.temperature, " °C")}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

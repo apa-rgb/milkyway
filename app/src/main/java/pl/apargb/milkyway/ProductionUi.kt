@@ -146,15 +146,15 @@ private fun ProductionTanksPage(ui: InventoryUiState, assumptions: Map<Departmen
                                     Text(tank.name, fontWeight = FontWeight.Bold, color = department.accent)
                                     status.laboratoryMeasuredAt?.let { LaboratoryBadge(it, Modifier.testTag("production-lab-marker-${tank.id}")) }
                                 }
-                                Text(status.litres?.let { "${decimalLabel(it)} l" } ?: "Stan nieustalony")
+                                Text(status.litres?.let { "${decimalLabel(it)} l" } ?: "Stan nieustalony", fontWeight = FontWeight.SemiBold)
                             }
                             Text(if (department == Department.Butter)
                                 "Tłuszcz: ${status.measurements.fatPercent?.let { "${decimalLabel(it)} %" } ?: "—"}"
                             else "Brix: ${status.measurements.brix?.let { "${decimalLabel(it)} °Bx" } ?: "—"}",
-                                style = MaterialTheme.typography.bodySmall)
+                                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                             Text(estimate.kilograms?.let { "≈ ${decimalLabel(it.setScale(1, RoundingMode.HALF_UP))} kg" }
                                 ?: "Produkcja: — · ${estimate.missing}",
-                                modifier = Modifier.testTag("estimate-${tank.id}"), fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.testTag("estimate-${tank.id}"), fontWeight = FontWeight.Bold,
                                 color = if (status.litres?.signum() == 0) EmptyTankColor else department.accent)
                         }
                     }

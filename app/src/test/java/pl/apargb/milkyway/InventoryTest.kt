@@ -206,6 +206,24 @@ class InventoryTest {
         reject { OilBatch(today, today.minusDays(1)).validate() }
     }
 
+    @Test fun oilUrgencyStartsAfterPreviousNoonAndKeepsEmptyOrUnknownStockUnmarked() {
+        val zone = java.time.ZoneId.of("Europe/Warsaw")
+        // Normal dates and both daylight-saving transitions follow local noon.
+        listOf(java.time.LocalDate.of(2026, 10, 10), java.time.LocalDate.of(2026, 3, 29),
+            java.time.LocalDate.of(2026, 10, 25)).forEach { expiry ->
+            val status = TankStatus(litres = BigDecimal.ONE, oilBatch = OilBatch(expiresOn = expiry))
+            val boundary = expiry.minusDays(1).atTime(12, 0).atZone(zone).toInstant()
+            assertFalse(status.oilExpiresWithinDay(boundary.minusSeconds(1), zone))
+            assertFalse(status.oilExpiresWithinDay(boundary, zone))
+            assertTrue(status.oilExpiresWithinDay(boundary.plusSeconds(1), zone))
+            assertTrue(status.oilExpiresWithinDay(expiry.atTime(12, 0).atZone(zone).toInstant(), zone))
+            assertTrue(status.oilExpiresWithinDay(expiry.plusDays(1).atStartOfDay(zone).toInstant(), zone))
+            assertFalse(status.copy(litres = BigDecimal.ZERO).oilExpiresWithinDay(boundary.plusSeconds(1), zone))
+            assertFalse(status.copy(litres = null).oilExpiresWithinDay(boundary.plusSeconds(1), zone))
+            assertFalse(status.copy(oilBatch = OilBatch()).oilExpiresWithinDay(boundary.plusSeconds(1), zone))
+        }
+    }
+
     @Test fun resetClearsCurrentBatchAndMeasurementsAndKeepsAuditOfPreviousVolume() {
         val date = java.time.LocalDate.of(2026, 10, 10)
         val old = TankStatus(BigDecimal("200"), measurements, 100L, material = "Olej", oilType = "Rzepakowy",

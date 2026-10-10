@@ -53,6 +53,14 @@ data class OilBatch(val producedOn: LocalDate? = null, val expiresOn: LocalDate?
 fun TankStatus.oilExpiresSoon(today: LocalDate): Boolean =
     litres?.signum() == 1 && oilBatch.expiresOn?.let { ChronoUnit.DAYS.between(today, it) < 3 } == true
 
+internal fun TankStatus.oilExpiresWithinDay(now: java.time.Instant, zone: java.time.ZoneId): Boolean =
+    litres?.signum() == 1 && oilBatch.expiresOn?.let {
+        // Noon on the expiry date; warn after noon on the preceding calendar day,
+        // including across daylight-saving changes in the phone's time zone.
+        val warningStarts = it.minusDays(1).atTime(12, 0).atZone(zone).toInstant()
+        now > warningStarts
+    } == true
+
 // Immutable inventory events already sync with older installations. Keep batch dates
 // in an existing event field so an older client's snapshot cannot discard them.
 internal const val OIL_BATCH_MARKER = "\n[milkyway-oil-batch:v1]"

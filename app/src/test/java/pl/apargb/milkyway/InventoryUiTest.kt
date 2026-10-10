@@ -432,6 +432,8 @@ class InventoryUiTest {
                 repo.apply { it.setState("Olej 12", BigDecimal("1000"), Measurements(brix = BigDecimal("5"), ph = BigDecimal("6"), temperature = BigDecimal("20")), 100L) }
                 repo.apply { it.setOilBatch("Olej 12", "Rzepakowy", OilBatch(today.minusDays(2), today.plusDays(2)), 200L) }
                 repo.apply { it.receive("Olej 12", BigDecimal("100"), "Dostawa oleju", Measurements(temperature = BigDecimal("21")), 300L) }
+                repo.apply { it.setState("Olej 14", BigDecimal("1000"), Measurements(temperature = BigDecimal("19")), 400L) }
+                repo.apply { it.setOilBatch("Olej 14", "Słonecznikowy", OilBatch(today.minusDays(2), today), 500L) }
             } finally { repo.close() }
         }
         compose.runOnIdle { model.reload() }
@@ -447,7 +449,15 @@ class InventoryUiTest {
         compose.onNodeWithTag("oil-expiry-Olej 12", useUnmergedTree = true)
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
         org.junit.Assert.assertEquals(OilWarningColor, textLayouts.single().layoutInput.style.color)
+        compose.onNodeWithTag("oil-expiry-Olej 14", useUnmergedTree = true)
+            .assertTextEquals("Ważność: ${today.oilDateLabel()}").assertTextColor(androidx.compose.ui.graphics.Color.White)
+        compose.onNodeWithTag("measurements-Olej 14", useUnmergedTree = true).assertTextColor(OilUrgentSecondary)
         screenshot("oleje-daty-waznosc")
+        compose.onNodeWithTag("tank-heading-Olej 14").performClick()
+        compose.onNodeWithTag("detail-oil-expiry-Olej 14", useUnmergedTree = true).performScrollTo()
+            .assertTextEquals("Data ważności: ${today.oilDateLabel()}").assertTextColor(androidx.compose.ui.graphics.Color.White)
+        screenshot("oleje-bordowy-szczegoly")
+        compose.onNodeWithContentDescription("Wróć do działu").performClick()
         compose.onNodeWithTag("oil-type-Olej 12").performClick()
         compose.onNodeWithTag("oil-production-date").performClick()
         compose.onNodeWithTag("oil-production-date-calendar").assertExists()
