@@ -18,8 +18,8 @@ android {
         applicationId = "pl.apargb.milkyway"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "0.7.9"
+        versionCode = 37
+        versionName = "0.7.10"
         buildConfigField("String", "FIREBASE_PROJECT_ID", firebaseValue("projectId"))
         buildConfigField("String", "FIREBASE_API_KEY", firebaseValue("apiKey"))
         buildConfigField("String", "FIREBASE_APP_ID", firebaseValue("applicationId"))

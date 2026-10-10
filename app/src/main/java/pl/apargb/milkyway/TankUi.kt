@@ -299,18 +299,21 @@ fun TankOperationDialog(tank: Tank, mode: TankEditor, ui: InventoryUiState, shif
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TankFormDialog(title: String, saving: Boolean, canSave: Boolean, onClose: () -> Unit,
-                           onSave: () -> Unit, content: @Composable () -> Unit) {
+                           onSave: () -> Unit, footer: @Composable () -> Unit = {}, content: @Composable () -> Unit) {
     Dialog(onDismissRequest = { if (!saving) onClose() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Surface(Modifier.fillMaxSize()) {
             Scaffold(
                 topBar = { TopAppBar(title = { Text(title) }) },
                 bottomBar = {
-                    Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = onClose, enabled = !saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
-                        Button(onClick = onSave, enabled = !saving && canSave, modifier = Modifier.weight(1f)) {
-                            Text(if (saving) "Zapisywanie…" else "Zapisz")
+                    Column {
+                        footer()
+                        Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(onClick = onClose, enabled = !saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
+                            Button(onClick = onSave, enabled = !saving && canSave, modifier = Modifier.weight(1f).testTag("form-save-$title")) {
+                                Text(if (saving) "Zapisywanie…" else "Zapisz")
+                            }
                         }
                     }
                 }

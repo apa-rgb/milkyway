@@ -17,11 +17,13 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                                 model: ProductionQueueViewModel, onClose: () -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     var important by rememberSaveable { mutableStateOf(false) }
+    var reminderMetadata by rememberSaveable { mutableStateOf("") }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     val notes = ui.productNotes.filter { it.entryId == entry.id }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     TankFormDialog("Notatki produktu", saving = ui.saving, canSave = text.isNotBlank(), onClose = onClose,
-        onSave = { model.addProductNote(requestId, entry, stage, withImportantText(text, important)) }, content = {
+        onSave = { model.addProductNote(requestId, entry, stage, withNoteReminder(withImportantText(text, important), noteReminder(reminderMetadata))) },
+        footer = { ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) } }, content = {
             Column(Modifier.testTag("product-notes-dialog"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
                 Text("${entry.line.title} · ${stage.title}", style = MaterialTheme.typography.bodySmall)
@@ -58,6 +60,9 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                             }
                             Text(note.visibleText, modifier = Modifier.testTag("product-note-${note.id}"),
                                 color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
+                            if (!note.isProductionCode()) ReminderButton(note.reminder, !ui.saving, "product-note-reminder-${note.id}") {
+                                model.scheduleReminder(note, it)
+                            }
                         }
                     }
                 }

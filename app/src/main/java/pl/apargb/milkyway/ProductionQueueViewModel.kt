@@ -59,6 +59,14 @@ class ProductionQueueViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun setProductNoteImportant(note: ProductNote, important: Boolean) = mutate { it.setProductNoteImportant(note, important) }
+    internal fun scheduleReminder(note: ProductNote, at: Long) {
+        val reminder = NoteReminder(at)
+        mutate { it.scheduleProductReminder(note, reminder, System.currentTimeMillis()) }
+    }
+    internal fun actReminder(note: ProductNote, token: String, action: ReminderAction) {
+        val reader = CloudSession.get(getApplication()).state.value.reminderReader
+        mutate { it.actProductReminder(note, token, action, reader) }
+    }
 
     fun recordProduction(requestId: String, entry: ProductionQueueEntry, amount: BigDecimal?) = mutate(requestId) {
         it.recordProduction(requestId, entry.id, entry.line, entry.date, amount, System.currentTimeMillis())

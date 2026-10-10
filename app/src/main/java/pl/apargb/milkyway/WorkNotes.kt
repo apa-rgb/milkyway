@@ -50,10 +50,13 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
             val old = db.query("work_notes", null, "id = ?", arrayOf(id), null, null, null)
                 .use { if (it.moveToFirst()) it.note() else null }
             require(old == null || (old.scope == scope && old.kind == kind)) { "Wpis należy do innej zmiany lub sekcji." }
+            val incoming = noteReminder(body)
+            val reminder = if (incoming == null || incoming.token == old?.reminder?.token) old?.reminder ?: incoming
+                else incoming.also { validateReminder(it, now) }
             val values = ContentValues().apply {
                 put("id", id); put("scope", scope); put("kind", kind.name)
-                put("title", title.trim()); put("body", withNoteAuthor(body, if (old == null) author else old.author))
-                put("completed", if (old?.completed == true && kind == NoteKind.REMINDER) 1 else 0)
+                put("title", title.trim()); put("body", withNoteReminder(withNoteAuthor(body, if (old == null) author else old.author), reminder))
+                put("completed", if (old?.completed == true && kind == NoteKind.REMINDER && reminder?.token == old.reminder?.token) 1 else 0)
                 put("created_at", old?.createdAt ?: now); put("updated_at", now)
             }
             if (old == null) db.insertOrThrow("work_notes", null, values)
@@ -65,9 +68,41 @@ internal class WorkNotesRepository(context: Context, private val helper: WorkNot
 
     @Synchronized fun setCompleted(note: WorkNote, completed: Boolean, now: Long): List<WorkNote> {
         require(note.kind == NoteKind.REMINDER) { "Stan wykonania dotyczy przypomnień." }
-        val values = ContentValues().apply { put("completed", if (completed) 1 else 0); put("updated_at", now) }
+        val current = currentNote(note)
+        val values = ContentValues().apply {
+            put("completed", if (completed) 1 else 0); put("updated_at", now)
+            current.reminder?.let { put("body", withNoteReminder(current.body, it.copy(done = completed))) }
+        }
         require(helper.writableDatabase.update("work_notes", values, "id = ? AND scope = ? AND kind = ?",
             arrayOf(note.id, note.scope.toString(), note.kind.name)) == 1) { "Nie znaleziono przypomnienia." }
+        return load()
+    }
+
+    private fun currentNote(note: WorkNote): WorkNote = helper.writableDatabase.query("work_notes", null,
+        "id = ? AND scope = ? AND kind = ?", arrayOf(note.id, note.scope.toString(), note.kind.name), null, null, null)
+        .use { if (it.moveToFirst()) it.note() else throw IllegalArgumentException("Nie znaleziono notatki.") }
+
+    @Synchronized fun scheduleReminder(note: WorkNote, reminder: NoteReminder, now: Long): List<WorkNote> {
+        validateReminder(reminder, now)
+        return changeReminder(note, now, resetComplete = true) { withNoteReminder(it.body, reminder) }
+    }
+
+    @Synchronized fun actReminder(note: WorkNote, token: String, action: ReminderAction, reader: String, now: Long): List<WorkNote> =
+        changeReminder(note, now, action == ReminderAction.DONE) { changedReminderText(it.body, token, action, reader) }
+
+    private fun changeReminder(note: WorkNote, now: Long, complete: Boolean = false, resetComplete: Boolean = false, change: (WorkNote) -> String): List<WorkNote> {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val current = currentNote(note)
+            val values = ContentValues().apply {
+                put("body", change(current)); put("updated_at", now)
+                if (complete && current.kind == NoteKind.REMINDER) put("completed", 1)
+                if (resetComplete && current.kind == NoteKind.REMINDER) put("completed", 0)
+            }
+            db.update("work_notes", values, "id = ?", arrayOf(current.id))
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
         return load()
     }
 

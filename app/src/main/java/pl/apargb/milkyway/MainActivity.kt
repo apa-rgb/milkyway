@@ -1,6 +1,7 @@
 package pl.apargb.milkyway
 
 import android.os.Bundle
+import android.content.Intent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,15 +35,28 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
+    internal val reminderOpen = MutableStateFlow(0L)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null && intent?.getBooleanExtra(ReminderScheduler.OPEN_HOME, false) == true) reminderOpen.value++
+        intent?.removeExtra(ReminderScheduler.OPEN_HOME)
         setContent {
             MaterialTheme(colorScheme = MilkywayColors) { MilkywayRoot() }
         }
     }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(ReminderScheduler.OPEN_HOME, false)) reminderOpen.value++
+        intent.removeExtra(ReminderScheduler.OPEN_HOME)
+    }
+    override fun onStart() { super.onStart(); ReminderScheduler.foreground = true; ReminderScheduler.restore(this) }
+    override fun onStop() { super.onStop(); ReminderScheduler.foreground = false; ReminderScheduler.deliverDue(this) }
 }
 
 private enum class Section(val title: String, val icon: ImageVector) {
@@ -98,6 +113,28 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
     val inProduction = section == Section.Production || section == Section.Other || (section == Section.Controls && controlKind == NoteKind.PRODUCTION)
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
+    val pageState = rememberSaveableStateHolder()
+    val reminderItems = remember(notes.notes, queue.entries, queue.productNotes) {
+        workReminderItems(notes.notes) + productReminderItems(queue.entries, queue.productNotes)
+    }
+    var reminderNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { delay(1000); reminderNow = System.currentTimeMillis() } }
+    val due = reminderItems
+        .filter { (if (it.domain == "notes") !notes.loading && notes.loadError == null else !queue.loading && queue.loadError == null) &&
+            it.reminder.due(cloud.reminderReader, reminderNow) }
+        .sortedWith(compareByDescending<ReminderItem> { it.important }.thenBy { it.reminder.at }.thenBy { it.key }).firstOrNull()
+    LaunchedEffect(notes.notes, notes.loading, notes.loadError, cloud.reminderReader, cloud.ready) {
+        if (!notes.loading && notes.loadError == null && (!cloud.configured || cloud.ready))
+            ReminderScheduler.syncDomain(context, cloud.reminderReader, "notes", workReminderItems(notes.notes))
+    }
+    LaunchedEffect(queue.entries, queue.productNotes, queue.loading, queue.loadError, cloud.reminderReader, cloud.ready) {
+        if (!queue.loading && queue.loadError == null && (!cloud.configured || cloud.ready))
+            ReminderScheduler.syncDomain(context, cloud.reminderReader, "production", productReminderItems(queue.entries, queue.productNotes))
+    }
+    LaunchedEffect(due?.key) { if (due != null) { sectionName = Section.Home.name; labUnlocked = false } }
+    val reminderOpen = (context as? MainActivity)?.reminderOpen
+    val openRequest by (reminderOpen ?: remember { MutableStateFlow(0L) }).collectAsState()
+    LaunchedEffect(openRequest) { if (openRequest > 0) sectionName = Section.Home.name }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) labUnlocked = false }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -160,106 +197,108 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         },
         bottomBar = { if (cloud.configured || section == Section.Home) CloudStatus(cloud, saving) }
     ) { padding ->
-        if (section == Section.Tanks) {
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                TankDepartmentPage(Department.valueOf(departmentName), inventory,
-                    onDepartment = { departmentName = it.name }, onTank = { detailsTankId = it.id },
-                    onEdit = { openEditor(it, TankEditor.STATE) },
-                    onOilType = { inventoryModel.clearError(); oilTypeTankId = it.id },
-                    onRouting = { inventoryModel.clearError(); routingTankId = it.id }, onRetry = inventoryModel::reload)
-            }
-        } else if (section == Section.Laboratory) {
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                if (cloud.configured && !cloud.laboratory) {
-                    Text("To konto jest operatorem. Pomiary laboratoryjne wymagają konta z uprawnieniami Laboratorium.", Modifier.padding(24.dp))
-                } else if (labUnlocked) LaboratoryPage(inventory, inventoryModel, selectedShift, inventoryModel::reload)
-                else LaboratoryLockPage(onUnlock = { labUnlocked = true })
-            }
-        } else if (section == Section.Announcements) {
-            Box(Modifier.fillMaxSize().padding(padding)) { AnnouncementBoardPage(notes, notesModel) }
-        } else if (section == Section.Completed) {
-            Box(Modifier.fillMaxSize().padding(padding)) { ProductionCompletedPage(queue, queueModel) }
-        } else if (inProduction) {
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                ProductionPage(selectedShift, notesModel, notes, inventory, assumptions, productionModel,
-                    onEdit = { openEditor(it, TankEditor.STATE) }, onRetry = inventoryModel::reload,
-                    destination = productionDestination, onNavigate = { productionDestinationName = it.name },
-                    queue = queue, queueModel = queueModel)
-            }
-        } else if (section == Section.Reminders || section == Section.Notes || (section == Section.Controls && controlKind != null)) {
-            Box(Modifier.fillMaxSize().padding(padding)) {
-                val kind = when (section) {
-                    Section.Reminders -> NoteKind.REMINDER
-                    Section.Notes -> NoteKind.CURRENT_NOTES
-                    else -> controlKind!!
+        pageState.SaveableStateProvider("$sectionName:$selectedShift:$controlName:$productionDestinationName") {
+            if (section == Section.Tanks) {
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    TankDepartmentPage(Department.valueOf(departmentName), inventory,
+                        onDepartment = { departmentName = it.name }, onTank = { detailsTankId = it.id },
+                        onEdit = { openEditor(it, TankEditor.STATE) },
+                        onOilType = { inventoryModel.clearError(); oilTypeTankId = it.id },
+                        onRouting = { inventoryModel.clearError(); routingTankId = it.id }, onRetry = inventoryModel::reload)
                 }
-                key(kind, selectedShift) {
-                    WorkNotesPage(kind, selectedShift, notesModel, notes)
+            } else if (section == Section.Laboratory) {
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    if (cloud.configured && !cloud.laboratory) {
+                        Text("To konto jest operatorem. Pomiary laboratoryjne wymagają konta z uprawnieniami Laboratorium.", Modifier.padding(24.dp))
+                    } else if (labUnlocked) LaboratoryPage(inventory, inventoryModel, selectedShift, inventoryModel::reload)
+                    else LaboratoryLockPage(onUnlock = { labUnlocked = true })
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).testTag("main-list"),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                if (section != Section.Home && section != Section.Dashboard) item {
-                    Text(section.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            } else if (section == Section.Announcements) {
+                Box(Modifier.fillMaxSize().padding(padding)) { AnnouncementBoardPage(notes, notesModel) }
+            } else if (section == Section.Completed) {
+                Box(Modifier.fillMaxSize().padding(padding)) { ProductionCompletedPage(queue, queueModel) }
+            } else if (inProduction) {
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    ProductionPage(selectedShift, notesModel, notes, inventory, assumptions, productionModel,
+                        onEdit = { openEditor(it, TankEditor.STATE) }, onRetry = inventoryModel::reload,
+                        destination = productionDestination, onNavigate = { productionDestinationName = it.name },
+                        queue = queue, queueModel = queueModel)
                 }
-                when (section) {
-                    Section.Home -> {
-                        item { HomeOverview(null) }
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Wybierz zmianę", fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Wybierz zmianę, na której pracujesz.", style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (section == Section.Reminders || section == Section.Notes || (section == Section.Controls && controlKind != null)) {
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    val kind = when (section) {
+                        Section.Reminders -> NoteKind.REMINDER
+                        Section.Notes -> NoteKind.CURRENT_NOTES
+                        else -> controlKind!!
+                    }
+                    key(kind, selectedShift) {
+                        WorkNotesPage(kind, selectedShift, notesModel, notes)
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(padding).testTag("main-list"),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    if (section != Section.Home && section != Section.Dashboard) item {
+                        Text(section.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    }
+                    when (section) {
+                        Section.Home -> {
+                            item { HomeOverview(null) }
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Wybierz zmianę", fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Wybierz zmianę, na której pracujesz.", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
-                        }
-                        item {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    (1..3).forEach { shift ->
-                                        ShiftSelectionCard(shift, selectedShift == shift) {
-                                            selectedShift = shift; sectionName = Section.Dashboard.name
+                            item {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        (1..3).forEach { shift ->
+                                            ShiftSelectionCard(shift, selectedShift == shift) {
+                                                selectedShift = shift; sectionName = Section.Dashboard.name
+                                            }
+                                        }
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        HomeProductionAction("Produkcja", "Planowanie i kolejka", Icons.Outlined.Factory, Department.Butter,
+                                            Modifier.testTag("home-Production")) {
+                                            productionReturnSection = Section.Home.name
+                                            productionDestinationName = ProductionDestination.MENU.name
+                                            sectionName = Section.Production.name
+                                        }
+                                        HomeProductionAction(Section.Announcements.title, "Ogłoszenia i sprawy do załatwienia", Section.Announcements.icon, Department.Reception,
+                                            Modifier.testTag("home-Announcements")) { sectionName = Section.Announcements.name }
+                                        HomeProductionAction(Section.Completed.title, "Towar gotowy i nadwyżki", Icons.Outlined.Inventory2, Department.Processing,
+                                            Modifier.testTag("home-Completed"), compactIcon = true) { sectionName = Section.Completed.name }
+                                        HomeProductionAction(Section.Other.title, "Zbiorniki i wpisy", Section.Other.icon, Department.Powder,
+                                            Modifier.testTag("home-Other")) {
+                                            productionDestinationName = ProductionDestination.OTHER_MENU.name
+                                            sectionName = Section.Other.name
                                         }
                                     }
                                 }
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    HomeProductionAction("Produkcja", "Planowanie i kolejka", Icons.Outlined.Factory, Department.Butter,
-                                        Modifier.testTag("home-Production")) {
-                                        productionReturnSection = Section.Home.name
-                                        productionDestinationName = ProductionDestination.MENU.name
-                                        sectionName = Section.Production.name
-                                    }
-                                    HomeProductionAction(Section.Announcements.title, "Ogłoszenia i sprawy do załatwienia", Section.Announcements.icon, Department.Reception,
-                                        Modifier.testTag("home-Announcements")) { sectionName = Section.Announcements.name }
-                                    HomeProductionAction(Section.Completed.title, "Towar gotowy i nadwyżki", Icons.Outlined.Inventory2, Department.Processing,
-                                        Modifier.testTag("home-Completed"), compactIcon = true) { sectionName = Section.Completed.name }
-                                    HomeProductionAction(Section.Other.title, "Zbiorniki i wpisy", Section.Other.icon, Department.Powder,
-                                        Modifier.testTag("home-Other")) {
-                                        productionDestinationName = ProductionDestination.OTHER_MENU.name
-                                        sectionName = Section.Other.name
-                                    }
-                                }
                             }
                         }
-                    }
-                    Section.Tanks -> Unit
-                    Section.Softlab -> item {
-                        val description = AppContent.softlabDescription
-                        if (description.isNullOrBlank()) {
-                            EmptyCard("Jak działa Softlab", "Instrukcje i wskazówki do programu pojawią się tutaj po dodaniu opisu.", Icons.Outlined.Description)
-                        } else {
-                            Card(Modifier.fillMaxWidth()) { Text(description, Modifier.padding(20.dp)) }
+                        Section.Tanks -> Unit
+                        Section.Softlab -> item {
+                            val description = AppContent.softlabDescription
+                            if (description.isNullOrBlank()) {
+                                EmptyCard("Jak działa Softlab", "Instrukcje i wskazówki do programu pojawią się tutaj po dodaniu opisu.", Icons.Outlined.Description)
+                            } else {
+                                Card(Modifier.fillMaxWidth()) { Text(description, Modifier.padding(20.dp)) }
+                            }
                         }
+                        Section.Dashboard -> {
+                            item { HomeOverview(selectedShift) }
+                            item { MainMenu { sectionName = it.name; controlName = null; productionDestinationName = ProductionDestination.MENU.name } }
+                        }
+                        Section.Controls -> item { ControlMenu { controlName = it.name; productionDestinationName = ProductionDestination.MENU.name } }
+                        Section.Reminders, Section.Notes, Section.Laboratory, Section.Production, Section.Announcements, Section.Other, Section.Completed -> Unit
                     }
-                    Section.Dashboard -> {
-                        item { HomeOverview(selectedShift) }
-                        item { MainMenu { sectionName = it.name; controlName = null; productionDestinationName = ProductionDestination.MENU.name } }
-                    }
-                    Section.Controls -> item { ControlMenu { controlName = it.name; productionDestinationName = ProductionDestination.MENU.name } }
-                    Section.Reminders, Section.Notes, Section.Laboratory, Section.Production, Section.Announcements, Section.Other, Section.Completed -> Unit
                 }
             }
         }
@@ -295,6 +334,13 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
     AppContent.tanks.find { it.id == oilTypeTankId }?.let { tank ->
         key(tank.id) {
             TankOilTypeDialog(tank, inventory, inventoryModel, selectedShift.takeIf { it != 0 }, onClose = { oilTypeTankId = null })
+        }
+    }
+    due?.let { item ->
+        DueReminderDialog(item, notes.saving || queue.saving,
+            if (item.domain == "notes") notes.operationError else queue.operationError) { action ->
+            if (item.domain == "notes") notes.notes.find { it.id == item.noteId }?.let { notesModel.actReminder(it, item.reminder.token, action) }
+            else queue.productNotes.find { it.id == item.noteId }?.let { queueModel.actReminder(it, item.reminder.token, action) }
         }
     }
 }

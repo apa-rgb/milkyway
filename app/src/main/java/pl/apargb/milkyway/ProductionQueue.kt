@@ -365,6 +365,7 @@ internal class ProductionQueueRepository(context: Context,
                 .use { if (it.moveToFirst()) it.getString(0) else null }
             if (old != null) require(old == entry.id) { "Ten zapis należy do innego produktu." }
             else {
+                noteReminder(text)?.let { validateReminder(it, now) }
                 val current = find(db, entry.id) ?: throw IllegalArgumentException("Nie znaleziono produktu.")
                 require(current.line == entry.line) { "Produkt należy do innego działu." }
                 require(when (stage) {
@@ -392,6 +393,28 @@ internal class ProductionQueueRepository(context: Context,
             require(current.first == note.entryId && !note.copy(text = current.second).isProductionCode()) { "To nie jest notatka produktu." }
             db.update("production_product_notes", ContentValues().apply { put("note", withImportantText(current.second, important)) },
                 "id = ?", arrayOf(note.id))
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+        return load()
+    }
+
+    @Synchronized fun scheduleProductReminder(note: ProductNote, reminder: NoteReminder, now: Long): List<ProductionQueueEntry> {
+        validateReminder(reminder, now)
+        return changeProductReminder(note) { withNoteReminder(it, reminder) }
+    }
+
+    @Synchronized fun actProductReminder(note: ProductNote, token: String, action: ReminderAction, reader: String): List<ProductionQueueEntry> =
+        changeProductReminder(note) { changedReminderText(it, token, action, reader) }
+
+    private fun changeProductReminder(note: ProductNote, change: (String) -> String): List<ProductionQueueEntry> {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            val current = db.query("production_product_notes", arrayOf("entry_id", "note"), "id = ?", arrayOf(note.id), null, null, null)
+                .use { if (it.moveToFirst()) it.getString(0) to it.getString(1) else null }
+                ?: throw IllegalArgumentException("Nie znaleziono notatki.")
+            require(current.first == note.entryId && !note.copy(text = current.second).isProductionCode()) { "To nie jest notatka produktu." }
+            db.update("production_product_notes", ContentValues().apply { put("note", change(current.second)) }, "id = ?", arrayOf(note.id))
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         return load()

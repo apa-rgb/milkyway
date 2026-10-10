@@ -45,6 +45,7 @@ internal class CloudSession private constructor(private val context: Context) {
         auth?.addAuthStateListener { firebase ->
             detach()
             val user = firebase.currentUser
+            if (user == null) ReminderScheduler.clear(context)
             mutableState.value = CloudSessionState(configured = configured, checking = user != null, error = loginError)
             user?.let(::verifyUser)
         }
@@ -92,7 +93,7 @@ internal class CloudSession private constructor(private val context: Context) {
             }
     }
 
-    fun signOut() { loginError = null; pendingLoginName = null; auth?.signOut() }
+    fun signOut() { loginError = null; pendingLoginName = null; ReminderScheduler.clear(context); auth?.signOut() }
     fun retry() {
         auth?.currentUser?.let { user ->
             detach()

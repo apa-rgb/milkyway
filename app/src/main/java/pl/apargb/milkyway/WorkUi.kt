@@ -149,6 +149,7 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
                                     style = MaterialTheme.typography.labelSmall, color = tone.accent)
                             }
                             NoteAuthorLabel(note.author, Modifier.testTag("note-author-${note.id}"))
+                            ReminderStatusLabel(note.reminder)
                         }
                     }
                 }
@@ -176,18 +177,22 @@ internal fun WorkNoteEditor(id: String, initial: WorkNote?, kind: NoteKind, scop
     var title by rememberSaveable { mutableStateOf(initial?.title ?: "") }
     var body by rememberSaveable { mutableStateOf(initial?.visibleBody ?: "") }
     var important by rememberSaveable { mutableStateOf(initial?.important ?: false) }
+    var reminderMetadata by rememberSaveable { mutableStateOf(initial?.reminder?.let { withNoteReminder("", it) }.orEmpty()) }
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
     Dialog(onDismissRequest = { if (!ui.saving) onClose() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Scaffold(topBar = { TopAppBar(title = { Text(if (initial == null) addLabel else "Edytuj wpis") }) },
             bottomBar = {
-                Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onClose, enabled = !ui.saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
-                    Button(onClick = { model.save(requestId, id, scope, kind, title, withImportantText(body, important)) },
-                        enabled = !ui.saving && title.isNotBlank(), modifier = Modifier.weight(1f)) {
-                        Text(if (ui.saving) "Zapisywanie…" else "Zapisz")
+                Column {
+                    ReminderButton(noteReminder(reminderMetadata), !ui.saving) { reminderMetadata = withNoteReminder("", NoteReminder(it)) }
+                    Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = onClose, enabled = !ui.saving, modifier = Modifier.weight(1f)) { Text("Anuluj") }
+                        Button(onClick = { model.save(requestId, id, scope, kind, title, withNoteReminder(withImportantText(body, important), noteReminder(reminderMetadata))) },
+                            enabled = !ui.saving && title.isNotBlank(), modifier = Modifier.weight(1f)) {
+                            Text(if (ui.saving) "Zapisywanie…" else "Zapisz")
+                        }
                     }
                 }
             }) { padding ->
