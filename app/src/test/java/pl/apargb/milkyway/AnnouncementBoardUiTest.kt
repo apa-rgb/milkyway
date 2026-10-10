@@ -100,4 +100,52 @@ class AnnouncementBoardUiTest {
         compose.onNodeWithText("Zaktualizowane ogłoszenie").assertExists()
         compose.onNodeWithTag("announcement-done-${note.id}").assertIsOn()
     }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp-xhdpi")
+    fun deletingFromCardCanBeCancelledAndRemovesOnlyTheChosenAnnouncementAfterRotation() {
+        WorkNotesRepository(model.getApplication()).let { repo ->
+            try {
+                repo.save("today-delete", 0, NoteKind.REMINDER, "", "Ogłoszenie do usunięcia", System.currentTimeMillis())
+                repo.save("today-keep", 0, NoteKind.REMINDER, "", "To ogłoszenie zostaje", System.currentTimeMillis())
+            } finally { repo.close() }
+        }
+        compose.runOnIdle { model.reload() }
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading } }
+        compose.onNodeWithTag("home-Announcements").performClick()
+        val deleteButton = compose.onNodeWithTag("announcement-delete-today-delete").performScrollTo().assertIsDisplayed()
+        val card = compose.onNodeWithTag("announcement-today-delete").getUnclippedBoundsInRoot()
+        val button = deleteButton.getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue(button.left > (card.left + card.right) / 2 && button.top == card.top)
+        compose.runOnIdle {
+            val view = WindowInspector.getGlobalWindowViews().last { it.isShown }
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            File("build/reports/screenshots/ogloszenia-usuwanie-znacznik.png").apply {
+                parentFile!!.mkdirs(); outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            bitmap.recycle()
+        }
+        deleteButton.performClick()
+        compose.onNodeWithText("Usunąć ogłoszenie?").assertIsDisplayed()
+        compose.onNodeWithTag("work-note-editor").assertDoesNotExist()
+        compose.onNodeWithText("Anuluj").performClick()
+        compose.runOnIdle { org.junit.Assert.assertTrue(model.state.value.notes.any { it.id == "today-delete" }) }
+        compose.onNodeWithTag("announcement-delete-today-delete").performClick()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithText("Usunąć ogłoszenie?").assertIsDisplayed()
+        compose.onNodeWithTag("announcement-delete-confirm").performClick()
+        compose.waitUntil(10000) { compose.runOnIdle { !model.state.value.loading && !model.state.value.saving &&
+            model.state.value.notes.none { it.id == "today-delete" } } }
+        compose.onNodeWithTag("announcement-delete-today-delete").assertDoesNotExist()
+        compose.onNodeWithTag("announcement-today-keep").performScrollTo().assertIsDisplayed()
+        WorkNotesRepository(model.getApplication()).let { repo ->
+            try { assertEquals(setOf("today-keep", "yesterday", "shift"), repo.load().map { it.id }.toSet()) }
+            finally { repo.close() }
+        }
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("announcement-today-keep").assertIsDisplayed()
+        compose.onNodeWithTag("announcements-previous-day").performClick()
+        compose.onNodeWithTag("announcement-yesterday").assertIsDisplayed()
+    }
 }

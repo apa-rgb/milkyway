@@ -1,5 +1,7 @@
 # Milkyway — aplikacja Android
 
+Wersja **0.7.18** dodaje bardzo mały znacznik kosza w prawym górnym rogu każdego ogłoszenia. Dotknięcie otwiera potwierdzenie usunięcia wyłącznie wybranego wpisu. Anulowanie zachowuje ogłoszenie, a ewentualny błąd zapisu pozostaje w oknie z możliwością ponowienia. Usuwanie korzysta z dotychczasowego zapisu wspólnych notatek.
+
 Wersja **0.7.17** wzmacnia czcionki i kontrast opisów, ilości oraz parametrów zbiorników. Olej ma termin ważności o **12:00 wskazanego dnia**. Intensywnie bordowy wiersz i karta szczegółów z jasnym tekstem pojawiają się **dzień wcześniej po 12:00** i pozostają po upływie terminu. W aplikacji widoczna jest wyłącznie data ważności, bez godziny. Reguła opiera się na lokalnym kalendarzu telefonu, także przy zmianie czasu. Puste zbiorniki nie są oznaczane alarmem. Dotychczasowy delikatnie czerwony kolor przy mniej niż trzech dniach ważności pozostaje dostępny. Kolor odświeża się wraz z czasem, bez ponownego wejścia na ekran.
 
 Wersja **0.7.16** zabezpiecza każde wejście do panelu zmiany 1–3 PIN-em **5522**. Błędny PIN i anulowanie pozostawiają ekran główny; wpisany kod nie jest zapisywany. Przyciski **Ważne**, **Przypomnienie** i **Załatwione** od początku mają odpowiednio czerwony, bursztynowy i zielony kolor, który staje się intensywniejszy po włączeniu. W formularzu produkcji **Masło** ma żółtą obwódkę, a **Mix** pomarańczową; wybrany rodzaj ma mocniejsze tło i ramkę.

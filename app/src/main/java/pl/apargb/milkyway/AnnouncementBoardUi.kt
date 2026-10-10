@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,11 +43,15 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
     val scope = rememberCoroutineScope()
     var calendarOpen by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<String?>(null) }
     val date = firstDay.plusDays(pages.currentPage.toLong())
     val announcements = ui.notes.filter { it.scope == ANNOUNCEMENT_SCOPE && it.kind == NoteKind.REMINDER }
         .sortedWith(compareByDescending<WorkNote> { it.createdAt }.thenBy { it.id })
     val byDay = announcements.groupBy { announcementDay(it.createdAt) }
     val enabled = !ui.loading && !ui.saving && ui.loadError == null
+    LaunchedEffect(announcements, ui.loading, ui.saving, deletingId) {
+        if (!ui.loading && !ui.saving && deletingId != null && announcements.none { it.id == deletingId }) deletingId = null
+    }
     fun changeDay(day: LocalDate) {
         if (day in firstDay..lastDay) scope.launch { pages.scrollToPage(ChronoUnit.DAYS.between(firstDay, day).toInt()) }
     }
@@ -78,7 +83,7 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
         }, enabled = enabled, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).testTag("announcements-add")) {
             Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Dodaj ogłoszenie")
         }
-        if (editingId == null) ui.operationError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
+        if (editingId == null && deletingId == null) ui.operationError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
         when {
             ui.loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
             ui.loadError != null -> Column(Modifier.padding(20.dp)) {
@@ -104,21 +109,28 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
                         Card(onClick = { model.clearError(); editingId = note.id }, enabled = enabled,
                             modifier = Modifier.fillMaxWidth().testTag("announcement-${note.id}"), shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = noteCardColor(note.id, note.completed))) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (note.title.isNotBlank()) Text(note.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                                    color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
-                                if (note.visibleBody.isNotBlank()) Text(note.visibleBody, maxLines = 6, overflow = TextOverflow.Ellipsis,
-                                    color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
-                                Text("Dodano: ${announcementTimestamp(note.createdAt)}", Modifier.testTag("announcement-created-${note.id}"),
-                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                NoteAuthorLabel(note.author, Modifier.testTag("announcement-author-${note.id}"))
-                                ReminderStatusLabel(note.reminder)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(note.completed, { model.setCompleted(note, it) }, enabled = enabled,
-                                        modifier = Modifier.testTag("announcement-done-${note.id}"))
-                                    Text(if (note.completed) "Załatwione" else "Do załatwienia",
-                                        Modifier.testTag("announcement-status-${note.id}"),
-                                        color = if (note.completed) Department.Processing.accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Box(Modifier.fillMaxWidth()) {
+                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (note.title.isNotBlank()) Text(note.title, Modifier.padding(end = 28.dp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                        color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
+                                    if (note.visibleBody.isNotBlank()) Text(note.visibleBody, Modifier.padding(end = 28.dp), maxLines = 6, overflow = TextOverflow.Ellipsis,
+                                        color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
+                                    Text("Dodano: ${announcementTimestamp(note.createdAt)}", Modifier.testTag("announcement-created-${note.id}"),
+                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    NoteAuthorLabel(note.author, Modifier.testTag("announcement-author-${note.id}"))
+                                    ReminderStatusLabel(note.reminder)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(note.completed, { model.setCompleted(note, it) }, enabled = enabled,
+                                            modifier = Modifier.testTag("announcement-done-${note.id}"))
+                                        Text(if (note.completed) "Załatwione" else "Do załatwienia",
+                                            Modifier.testTag("announcement-status-${note.id}"),
+                                            color = if (note.completed) Department.Processing.accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                IconButton(onClick = { model.clearError(); deletingId = note.id }, enabled = enabled,
+                                    modifier = Modifier.align(Alignment.TopEnd).size(40.dp).testTag("announcement-delete-${note.id}")) {
+                                    Icon(Icons.Outlined.DeleteOutline, "Usuń ogłoszenie: ${note.title.ifBlank { note.visibleBody.take(80) }}",
+                                        Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -136,6 +148,20 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
                 announcements.find { it.id == id }?.let { changeDay(announcementDay(it.createdAt)) }
             }, pageTitle = "Tablica ogłoszeń", addLabel = "Dodaj ogłoszenie")
     } }
+    announcements.find { it.id == deletingId }?.let { note ->
+        AlertDialog(onDismissRequest = { if (!ui.saving) deletingId = null },
+            title = { Text("Usunąć ogłoszenie?") }, text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(note.title.ifBlank { note.visibleBody }, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                    ui.operationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            }, confirmButton = {
+                TextButton(onClick = { model.delete(note) }, enabled = enabled,
+                    modifier = Modifier.testTag("announcement-delete-confirm")) { Text(if (ui.saving) "Usuwanie…" else "Usuń") }
+            }, dismissButton = {
+                TextButton(onClick = { deletingId = null }, enabled = !ui.saving) { Text("Anuluj") }
+            })
+    }
 }
 
 internal fun announcementDay(time: Long): LocalDate = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate()
