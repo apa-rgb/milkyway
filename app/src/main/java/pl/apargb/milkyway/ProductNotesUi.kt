@@ -45,7 +45,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                 }
                 if (notes.isEmpty()) Text("Brak dodatkowych notatek", style = MaterialTheme.typography.bodySmall)
                 notes.forEach { note ->
-                    Surface(shape = RoundedCornerShape(12.dp), color = entry.line.tone.tint) {
+                    Surface(shape = RoundedCornerShape(12.dp), color = noteCardColor(note.id, note.completed)) {
                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("${note.stage.title} · ${dateLabel(note.createdAt)}", style = MaterialTheme.typography.labelSmall,
                                 color = entry.line.tone.accent)

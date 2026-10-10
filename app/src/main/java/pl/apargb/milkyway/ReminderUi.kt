@@ -173,7 +173,7 @@ internal fun DueReminderDialog(item: ReminderItem, saving: Boolean, error: Strin
     }
     Dialog(onDismissRequest = {}, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxWidth().alpha(if (faded) 0.92f else 1f).testTag("due-reminder"), shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface, border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))) {
+            color = noteCardColor(item.noteId), border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Przypomnienie · ${reminderLabel(item.reminder)}", style = MaterialTheme.typography.labelMedium)
                 Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {

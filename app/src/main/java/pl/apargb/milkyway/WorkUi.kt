@@ -123,7 +123,7 @@ fun WorkNotesPage(kind: NoteKind, scope: Int, model: WorkNotesViewModel, ui: Wor
                 items(notes, key = { it.id }) { note ->
                     Card(onClick = { if (!ui.saving) { model.clearError(); editingId = note.id } },
                         modifier = Modifier.fillMaxWidth().testTag("note-${note.id}"), shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(containerColor = noteCardColor(note.id, note.completed)),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

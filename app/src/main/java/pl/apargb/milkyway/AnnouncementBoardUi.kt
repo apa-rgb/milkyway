@@ -103,7 +103,7 @@ internal fun AnnouncementBoardPage(ui: WorkNotesState, model: WorkNotesViewModel
                     items(dayNotes, key = { it.id }) { note ->
                         Card(onClick = { model.clearError(); editingId = note.id }, enabled = enabled,
                             modifier = Modifier.fillMaxWidth().testTag("announcement-${note.id}"), shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = if (note.completed) Department.Processing.tint else MaterialTheme.colorScheme.surface)) {
+                            colors = CardDefaults.cardColors(containerColor = noteCardColor(note.id, note.completed))) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (note.title.isNotBlank()) Text(note.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                                     color = if (note.important) ImportantNoteColor else MaterialTheme.colorScheme.onSurface)
