@@ -1,0 +1,28 @@
+name: iOS
+on:
+  push:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  iphone:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Core interoperability tests
+        run: bash ios/scripts/test-core.sh
+      - name: Unconfigured simulator build
+        run: |
+          python3 ios/scripts/configure.py --example
+          xcodebuild -project ios/Milkyway.xcodeproj -scheme Milkyway -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build
+      - name: Verify device target without signing
+        run: xcodebuild -project ios/Milkyway.xcodeproj -scheme Milkyway -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Milkyway-iOS-simulator
+          path: ios/DerivedData/Build/Products/Debug-iphonesimulator/Milkyway.app
+          if-no-files-found: error

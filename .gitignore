@@ -11,3 +11,11 @@ cloud/.venv/
 cloud/node_modules/
 cloud/*-debug.log
 cloud/.firebase/
+ios/.build/
+ios/.swiftpm/
+ios/DerivedData/
+ios/Resources/MilkywayCloud.plist
+**/GoogleService-Info.plist
+**/xcuserdata/
+*.ipa
+*.xcarchive/

@@ -1,0 +1,324 @@
+[
+  {
+    "id": "LBT 1",
+    "name": "LBT 1",
+    "description": "Mleko odtłuszczone",
+    "capacityLitres": 100000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LBT 2",
+    "name": "LBT 2",
+    "description": "Mleko odtłuszczone",
+    "capacityLitres": 100000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LBT 3",
+    "name": "LBT 3",
+    "description": "Mleko odtłuszczone",
+    "capacityLitres": 100000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LAT 1",
+    "name": "LAT 1",
+    "description": "Mleko pełne",
+    "capacityLitres": 100000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LAT 2",
+    "name": "LAT 2",
+    "description": "Śmietana",
+    "capacityLitres": 100000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LAT 3",
+    "name": "LAT 3",
+    "description": "Mleko pełne",
+    "capacityLitres": 70000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LAT 4",
+    "name": "LAT 4",
+    "description": "Serwatka / uniwersalny",
+    "capacityLitres": 70000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LAT 5",
+    "name": "LAT 5",
+    "description": "Maślanka z wirowania",
+    "capacityLitres": 60000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "LAT 6",
+    "name": "LAT 6",
+    "description": "Maślanka z wirowania",
+    "capacityLitres": 40000,
+    "group": "Odbieralnia — LBT / LAT"
+  },
+  {
+    "id": "O-Tank 6",
+    "name": "O-Tank 6",
+    "description": "Śmietana",
+    "capacityLitres": 15000,
+    "group": "Odbieralnia — śmietana"
+  },
+  {
+    "id": "O-Tank 7",
+    "name": "O-Tank 7",
+    "description": "Śmietana",
+    "capacityLitres": 15000,
+    "group": "Odbieralnia — śmietana"
+  },
+  {
+    "id": "Olej 12",
+    "name": "Olej 12",
+    "description": "Olej",
+    "capacityLitres": 10000,
+    "group": "Oleje"
+  },
+  {
+    "id": "Olej 13",
+    "name": "Olej 13",
+    "description": "Olej",
+    "capacityLitres": 20000,
+    "group": "Oleje"
+  },
+  {
+    "id": "Olej 14",
+    "name": "Olej 14",
+    "description": "Olej",
+    "capacityLitres": 20000,
+    "group": "Oleje"
+  },
+  {
+    "id": "Olej 15",
+    "name": "Olej 15",
+    "description": "Olej",
+    "capacityLitres": 10000,
+    "group": "Oleje"
+  },
+  {
+    "id": "Olej 16",
+    "name": "Olej 16",
+    "description": "Olej",
+    "capacityLitres": 60000,
+    "group": "Oleje"
+  },
+  {
+    "id": "Olej 17",
+    "name": "Olej 17",
+    "description": "Olej",
+    "capacityLitres": 60000,
+    "group": "Oleje"
+  },
+  {
+    "id": "MBT 1",
+    "name": "MBT 1",
+    "description": "UHT / przygotowanie miksów",
+    "capacityLitres": null,
+    "group": "Aparatownia"
+  },
+  {
+    "id": "MBT 2",
+    "name": "MBT 2",
+    "description": "UHT / przygotowanie miksów",
+    "capacityLitres": null,
+    "group": "Aparatownia"
+  },
+  {
+    "id": "MBT 3",
+    "name": "MBT 3",
+    "description": "UHT / przygotowanie miksów",
+    "capacityLitres": null,
+    "group": "Aparatownia"
+  },
+  {
+    "id": "LFT 1",
+    "name": "LFT 1",
+    "description": "Maślanka do wirowania",
+    "capacityLitres": 10000,
+    "group": "Aparatownia"
+  },
+  {
+    "id": "LFT 2",
+    "name": "LFT 2",
+    "description": "Maślanka do wirowania",
+    "capacityLitres": 10000,
+    "group": "Aparatownia"
+  },
+  {
+    "id": "M-Tank 1",
+    "name": "M-Tank 1",
+    "description": "Masłownia",
+    "capacityLitres": 10000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "M-Tank 2",
+    "name": "M-Tank 2",
+    "description": "Masłownia",
+    "capacityLitres": 10000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "M-Tank 3",
+    "name": "M-Tank 3",
+    "description": "Masłownia",
+    "capacityLitres": 10000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "M-Tank 4",
+    "name": "M-Tank 4",
+    "description": "Masłownia",
+    "capacityLitres": 10000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "M-Tank 5",
+    "name": "M-Tank 5",
+    "description": "Wyłączony",
+    "capacityLitres": null,
+    "group": "Masłownia"
+  },
+  {
+    "id": "M-Tank 6",
+    "name": "M-Tank 6",
+    "description": "Masłownia",
+    "capacityLitres": 2000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "LDT 1",
+    "name": "LDT 1",
+    "description": "Masłownia",
+    "capacityLitres": 20000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "LDT 2",
+    "name": "LDT 2",
+    "description": "Masłownia",
+    "capacityLitres": 20000,
+    "group": "Masłownia"
+  },
+  {
+    "id": "Silos 1",
+    "name": "Silos 1",
+    "description": "Podgęszczona",
+    "capacityLitres": 60000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 2",
+    "name": "Silos 2",
+    "description": "Proszkownia",
+    "capacityLitres": 60000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 3",
+    "name": "Silos 3",
+    "description": "Proszkownia",
+    "capacityLitres": 60000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 4",
+    "name": "Silos 4",
+    "description": "Proszkownia",
+    "capacityLitres": 100000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 6",
+    "name": "Silos 6",
+    "description": "Rzadka (6 Bx)",
+    "capacityLitres": 150000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 7",
+    "name": "Silos 7",
+    "description": "Proszkownia",
+    "capacityLitres": 150000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 8",
+    "name": "Silos 8",
+    "description": "Podgęszczona (19)",
+    "capacityLitres": 20000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 9",
+    "name": "Silos 9",
+    "description": "Proszkownia",
+    "capacityLitres": 100000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 10",
+    "name": "Silos 10",
+    "description": "Proszkownia",
+    "capacityLitres": 100000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Silos 5",
+    "name": "Silos 5",
+    "description": "Woda",
+    "capacityLitres": 40000,
+    "group": "Proszkownia — silosy"
+  },
+  {
+    "id": "Kryst. 1",
+    "name": "Kryst. 1",
+    "description": "Proszkownia",
+    "capacityLitres": 15000,
+    "group": "Proszkownia — krystalizatory"
+  },
+  {
+    "id": "Kryst. 2",
+    "name": "Kryst. 2",
+    "description": "Proszkownia",
+    "capacityLitres": 15000,
+    "group": "Proszkownia — krystalizatory"
+  },
+  {
+    "id": "Kryst. 3",
+    "name": "Kryst. 3",
+    "description": "Proszkownia",
+    "capacityLitres": 10000,
+    "group": "Proszkownia — krystalizatory"
+  },
+  {
+    "id": "Kryst. 4",
+    "name": "Kryst. 4",
+    "description": "Proszkownia",
+    "capacityLitres": 10000,
+    "group": "Proszkownia — krystalizatory"
+  },
+  {
+    "id": "Kryst. 5",
+    "name": "Kryst. 5",
+    "description": "Proszkownia",
+    "capacityLitres": 10000,
+    "group": "Proszkownia — krystalizatory"
+  },
+  {
+    "id": "Kryst. 6",
+    "name": "Kryst. 6",
+    "description": "Proszkownia",
+    "capacityLitres": 10000,
+    "group": "Proszkownia — krystalizatory"
+  }
+]

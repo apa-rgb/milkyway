@@ -163,3 +163,7 @@ Rodzaj Masło/Mix i znacznik Ważne są zapisane jako czytelne adnotacje w istni
 Imię jest opcjonalne (do 60 znaków) i zapamiętywane na telefonie dla zweryfikowanego UID. Nie zmienia uprawnień ani hasła konta Firebase. Każda nowa notatka zapisuje podpis autora w istniejącym polu treści jako `[Autor: Imię]`, razem ze znacznikiem Ważne, jeśli go włączono. Aplikacja pokazuje podpis oddzielnie od treści; podgląd na kafelku i jego wysokość pozostają takie same. Edycja zachowuje autora pierwotnego wpisu. Schemat bazy i reguły Firebase pozostają zgodne z poprzednią wersją.
 
 Automatyczne kody zapisują się atomowo razem z terminem produkcji w dotychczasowej historii kodów. Identyfikator zdarzenia rozróżnia kod automatyczny od ręcznego, dzięki czemu tryb pozostaje po synchronizacji i odtworzeniu migawki. Bezpośrednie tworzenie planu oraz starsze plany bez kodu zachowują dotychczasowe zachowanie — automatyczne nadanie następuje przy przenoszeniu zamówienia z oczekujących.
+# Wersja na iPhone’a
+
+Projekt natywny SwiftUI (iOS 17+, Xcode 16+) znajduje się w [ios](ios/README.md).
+Współdzieli istniejące konta i dane Firebase z Androidem. Instrukcja opisuje konfigurację aplikacji Apple, uruchomienie na iPhonie i dystrybucję przez TestFlight. Kompilacja i podpis wymagają Maca; wersja Androida pozostaje bez zmian.

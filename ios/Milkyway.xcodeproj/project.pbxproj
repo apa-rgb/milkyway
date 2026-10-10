@@ -1,0 +1,43 @@
+// !$*UTF8*$!
+{
+ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+  9E65B3ADFE0E03C9912ED6C3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/App/CloudStore.swift"; sourceTree = SOURCE_ROOT; };
+  9811188BCA394C7F21CF253C = { isa = PBXBuildFile; fileRef = 9E65B3ADFE0E03C9912ED6C3; };
+  3FE68854B542FE9F43004811 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/App/MilkywayApp.swift"; sourceTree = SOURCE_ROOT; };
+  3594C32AC6280A91603B32BD = { isa = PBXBuildFile; fileRef = 3FE68854B542FE9F43004811; };
+  C17DE000409C0E303539D12A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/App/NotesView.swift"; sourceTree = SOURCE_ROOT; };
+  31AE5BBD108BA027BB92FA7B = { isa = PBXBuildFile; fileRef = C17DE000409C0E303539D12A; };
+  24098E034186FEA32FBC156C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/App/ProductionView.swift"; sourceTree = SOURCE_ROOT; };
+  00CC869E4CBA33D52F5FD15D = { isa = PBXBuildFile; fileRef = 24098E034186FEA32FBC156C; };
+  16D69C59822E5844DD182CA7 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/App/TanksView.swift"; sourceTree = SOURCE_ROOT; };
+  41E2948B93E2A7A319AD52E3 = { isa = PBXBuildFile; fileRef = 16D69C59822E5844DD182CA7; };
+  FD06571D036BB6261D5A3044 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/App/WarehouseView.swift"; sourceTree = SOURCE_ROOT; };
+  67B8A0C12DD558AAD8F9365B = { isa = PBXBuildFile; fileRef = FD06571D036BB6261D5A3044; };
+  D49B0D2EF79EBCAB3AE343C3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/Core/Operations.swift"; sourceTree = SOURCE_ROOT; };
+  31C5F89D2F513A1C0BBA842B = { isa = PBXBuildFile; fileRef = D49B0D2EF79EBCAB3AE343C3; };
+  EB19F99CAFC97492B6771C4B = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/Core/SharedData.swift"; sourceTree = SOURCE_ROOT; };
+  C2C2E9C257273529E291EDCE = { isa = PBXBuildFile; fileRef = EB19F99CAFC97492B6771C4B; };
+  0C299F368686D7C3AF7EE31B = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+  0561B6B779527A2FA058B6AB = { isa = PBXBuildFile; fileRef = 0C299F368686D7C3AF7EE31B; };
+  BF269E7A5D0A6222CA781AD9 = { isa = PBXFileReference; lastKnownFileType = text.json; path = "Resources/tanks.json"; sourceTree = SOURCE_ROOT; };
+  501077989BDEE64A51BCDFA0 = { isa = PBXBuildFile; fileRef = BF269E7A5D0A6222CA781AD9; };
+  BD1CE5227D9539D400DBCD25 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Resources/MilkywayCloud.plist"; sourceTree = SOURCE_ROOT; };
+  04B677D09F1AD1A4BC490710 = { isa = PBXBuildFile; fileRef = BD1CE5227D9539D400DBCD25; };
+  278AADAA5BC539AABB4EE416 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Resources/PrivacyInfo.xcprivacy"; sourceTree = SOURCE_ROOT; };
+  D04AF157FB143F17000DA183 = { isa = PBXBuildFile; fileRef = 278AADAA5BC539AABB4EE416; };
+  A8792157CB4F27FB949C035F = { isa = PBXFileReference; explicitFileType = wrapper.application; path = Milkyway.app; sourceTree = BUILT_PRODUCTS_DIR; };
+  0A3E27B8CA818264D75C8D81 = { isa = PBXGroup; children = (A8792157CB4F27FB949C035F,); name = Products; sourceTree = "<group>"; };
+  19F479106CE8C3BA8C106518 = { isa = PBXGroup; children = (9E65B3ADFE0E03C9912ED6C3, 3FE68854B542FE9F43004811, C17DE000409C0E303539D12A, 24098E034186FEA32FBC156C, 16D69C59822E5844DD182CA7, FD06571D036BB6261D5A3044, D49B0D2EF79EBCAB3AE343C3, EB19F99CAFC97492B6771C4B, 0C299F368686D7C3AF7EE31B, BF269E7A5D0A6222CA781AD9, BD1CE5227D9539D400DBCD25, 278AADAA5BC539AABB4EE416, 0A3E27B8CA818264D75C8D81,); sourceTree = "<group>"; };
+  878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (9811188BCA394C7F21CF253C, 3594C32AC6280A91603B32BD, 31AE5BBD108BA027BB92FA7B, 00CC869E4CBA33D52F5FD15D, 41E2948B93E2A7A319AD52E3, 67B8A0C12DD558AAD8F9365B, 31C5F89D2F513A1C0BBA842B, C2C2E9C257273529E291EDCE,); runOnlyForDeploymentPostprocessing = 0; };
+  41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (0561B6B779527A2FA058B6AB, 501077989BDEE64A51BCDFA0, 04B677D09F1AD1A4BC490710, D04AF157FB143F17000DA183,); runOnlyForDeploymentPostprocessing = 0; };
+  E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+  2B23A31EEC75B029432F2445 = { isa = XCBuildConfiguration; name = Debug; buildSettings = { CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; }; };
+  EDDA600A3F771F810A8065C9 = { isa = XCBuildConfiguration; name = Debug; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Resources/Info.plist; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = pl.apargb.milkyway.ios; PRODUCT_NAME = Milkyway; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; DEBUG_INFORMATION_FORMAT = dwarf; }; };
+  07CA1E69F6068DEA30A4DA6B = { isa = XCBuildConfiguration; name = Release; buildSettings = { CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; }; };
+  594BCDCC96599D88EF772A08 = { isa = XCBuildConfiguration; name = Release; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Resources/Info.plist; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = pl.apargb.milkyway.ios; PRODUCT_NAME = Milkyway; TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-O"; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; }; };
+  AD1646610FAAB916B1DAB3FC = { isa = XCConfigurationList; buildConfigurations = (2B23A31EEC75B029432F2445, 07CA1E69F6068DEA30A4DA6B,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+  9C5B038A078AB1DFD15318F0 = { isa = XCConfigurationList; buildConfigurations = (EDDA600A3F771F810A8065C9, 594BCDCC96599D88EF772A08,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+  34A04005BCAF206EEC990BD9 = { isa = PBXNativeTarget; buildConfigurationList = 9C5B038A078AB1DFD15318F0; buildPhases = (878A52FC5FF6A57D50B7B870, E2AA269EB967A8853A258BFA, 41D311A605520FC7B8B9A980,); buildRules = (); dependencies = (); name = Milkyway; productName = Milkyway; productReference = A8792157CB4F27FB949C035F; productType = "com.apple.product-type.application"; };
+  244210E48437B6556980A702 = { isa = PBXProject; attributes = { LastUpgradeCheck = 1600; }; buildConfigurationList = AD1646610FAAB916B1DAB3FC; compatibilityVersion = "Xcode 14.0"; developmentRegion = pl; hasScannedForEncodings = 0; knownRegions = (pl, en, Base); mainGroup = 19F479106CE8C3BA8C106518; productRefGroup = 0A3E27B8CA818264D75C8D81; projectDirPath = ""; projectRoot = ""; targets = (34A04005BCAF206EEC990BD9,); };
+ }; rootObject = 244210E48437B6556980A702;
+}
