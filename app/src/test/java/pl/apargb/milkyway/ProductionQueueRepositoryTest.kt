@@ -268,6 +268,50 @@ class ProductionQueueRepositoryTest {
             }
         } finally { java.util.TimeZone.setDefault(previousZone) }
     }
+    @Test fun automaticPowderCodesFollowProductionDatesIncludingLeapYearsAndRespectManualOverrides() {
+        val line = ProductionLine.POWDER
+        repository.save("auto", line, today, "Proszek", "", 1L, BigDecimal("1000"), pendingOrder = true)
+        fun schedule(date: LocalDate, now: Long) = repository.schedule(repository.load().single(), date, java.time.LocalTime.NOON, now)
+        fun code() = productionCode(repository.snapshot().productNotes, "auto")
+        schedule(LocalDate.of(2026, 10, 10), 2L); assertEquals("283", code())
+        schedule(LocalDate.of(2024, 12, 31), 3L); assertEquals("366", code())
+        schedule(LocalDate.of(2025, 1, 1), 4L); assertEquals("001", code())
+        schedule(LocalDate.of(2025, 1, 1), 5L)
+        assertEquals(3, repository.snapshot().productNotes.size)
+        repository.setProductionCode("manual", repository.load().single(), "007", 6L)
+        repository.returnToPending(repository.load().single(), 7L)
+        schedule(LocalDate.of(2026, 10, 10), 8L); assertEquals("007", code())
+        repository.setProductionCode("clear", repository.load().single(), "", 9L)
+        schedule(LocalDate.of(2026, 10, 11), 10L); assertEquals("", code())
+        assertEquals(5, repository.snapshot().productNotes.size)
+        repository.close(); repository = ProductionQueueRepository(context, today = { today })
+        assertEquals("", code())
+    }
+
+    @Test fun planningThroughEditorAssignsCodeOnlyToPowderAndDoesNotOverwriteAPendingManualCode() {
+        ProductionLine.entries.forEach { line ->
+            repository.save(line.name, line, today, "Produkt", "", 1L, BigDecimal("1000"), pendingOrder = true)
+            repository.save(line.name, line, LocalDate.of(2026, 1, 2), "Produkt", "", 2L,
+                pendingOrder = false, scheduledTime = java.time.LocalTime.NOON)
+            assertEquals(if (line == ProductionLine.POWDER) "002" else "", productionCode(repository.snapshot().productNotes, line.name))
+        }
+        repository.save("manual", ProductionLine.POWDER, today, "Ręczny", "", 3L, BigDecimal("1000"), pendingOrder = true)
+        val pending = repository.load().single { it.id == "manual" }
+        repository.setProductionCode("manual-code", pending, "999", 4L)
+        repository.schedule(pending, tomorrow, java.time.LocalTime.NOON, 5L)
+        assertEquals("999", productionCode(repository.snapshot().productNotes, "manual"))
+    }
+
+    @Test fun failureToWriteAutomaticCodeRollsBackSchedulingAsWell() {
+        repository.save("auto", ProductionLine.POWDER, today, "Proszek", "", 1L, BigDecimal("1000"), pendingOrder = true)
+        val before = repository.snapshot()
+        database.writableDatabase.execSQL("CREATE TRIGGER reject_code BEFORE INSERT ON production_product_notes BEGIN SELECT RAISE(ABORT, 'reject code'); END")
+        assertThrows(SQLiteException::class.java) {
+            repository.schedule(before.entries.single(), tomorrow, java.time.LocalTime.NOON, 2L)
+        }
+        assertEquals(before, repository.snapshot())
+    }
+
     @Test fun waitingOrdersAreUnscheduledAndSchedulingRetainsOneEntryAcrossAllLines() {
         ProductionLine.entries.forEach { line ->
             repository.save(line.name, line, today, "Zamówienie", "Klient", 100L, BigDecimal("500"), pendingOrder = true)
@@ -417,7 +461,8 @@ class ProductionQueueRepositoryTest {
         val before = repository.snapshot()
         repository.close(); repository = ProductionQueueRepository(context, today = { today })
         assertEquals(before, repository.snapshot())
-        assertEquals(12, before.productNotes.size); assertEquals(6, before.completions.size)
+        assertEquals(12, before.productNotes.count { !it.isProductionCode() }); assertEquals(6, before.completions.size)
+        assertEquals(1, before.productNotes.count { it.isAutomaticProductionCode() })
         assertTrue(before.entries.all { it.completed && it.description == "Pierwotny plan" && it.producedAmount == BigDecimal("1000") })
         assertEquals(ProductNoteStage.COMPLETED, before.productNotes.first().stage)
         assertThrows(IllegalArgumentException::class.java) { repository.delete(before.entries.first(), "5522") }

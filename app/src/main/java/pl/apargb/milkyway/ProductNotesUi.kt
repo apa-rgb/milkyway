@@ -48,6 +48,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("${note.stage.title} · ${dateLabel(note.createdAt)}", style = MaterialTheme.typography.labelSmall,
                                 color = entry.line.tone.accent)
+                            if (note.isAutomaticProductionCode()) Text("Kod dodany automatycznie", style = MaterialTheme.typography.labelSmall)
                             NoteAuthorLabel(note.author, Modifier.testTag("product-note-author-${note.id}"))
                             if (!note.isProductionCode()) Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(note.important, { model.setProductNoteImportant(note, it) }, enabled = !ui.saving,

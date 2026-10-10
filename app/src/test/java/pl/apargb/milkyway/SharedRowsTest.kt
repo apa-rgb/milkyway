@@ -204,6 +204,31 @@ class SharedRowsTest {
         }
     }
 
+    @Test fun automaticCodesStayAutomaticAcrossSharedSnapshotsUntilAnotherOperatorEditsThem() {
+        fun apply(previous: Map<String, Any?>, actor: Map<String, Any?>, block: (ProductionQueueRepository) -> Unit) =
+            ProductionQueueDatabase(context, null).useDatabase { helper ->
+                SharedRows.restore(helper, SharedDomain.PRODUCTION, previous)
+                block(ProductionQueueRepository(context, helper as ProductionQueueDatabase))
+                SharedRows.capture(helper, SharedDomain.PRODUCTION, previous, actor, 2000L)
+            }
+        val day = LocalDate.of(2026, 10, 10)
+        var snapshot = apply(emptyMap(), actor1) { repo ->
+            repo.save("powder", ProductionLine.POWDER, day, "Proszek", "", 1L, BigDecimal("1000"), pendingOrder = true)
+            repo.schedule(repo.load().single(), day, java.time.LocalTime.NOON, 2L)
+            assertEquals("283", productionCode(repo.snapshot().productNotes, "powder"))
+        }
+        snapshot = apply(snapshot, actor2) { repo ->
+            repo.schedule(repo.load().single(), day.plusDays(1), java.time.LocalTime.NOON, 3L)
+            assertEquals("284", productionCode(repo.snapshot().productNotes, "powder"))
+            repo.setProductionCode("manual", repo.load().single(), "007", 4L)
+        }
+        apply(snapshot, actor1) { repo ->
+            repo.schedule(repo.load().single(), day.plusDays(2), java.time.LocalTime.NOON, 5L)
+            assertEquals("007", productionCode(repo.snapshot().productNotes, "powder"))
+            assertEquals(3, repo.snapshot().productNotes.size)
+        }
+    }
+
     @Test fun importantWorkNotesSurviveSharedCompletionAndEditsWithoutLosingCreationTimeOrScope() {
         fun apply(previous: Map<String, Any?>, actor: Map<String, Any?>, block: (WorkNotesRepository) -> Unit) =
             WorkNotesDatabase(context, null).useDatabase { helper ->

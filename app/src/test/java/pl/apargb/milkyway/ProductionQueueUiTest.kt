@@ -452,6 +452,14 @@ class ProductionQueueUiTest {
             org.junit.Assert.assertEquals(today.plusDays(1), compose.runOnIdle { model.state.value.entries.single { it.id == order.id }.productionDate })
             compose.onNodeWithText("Brak oczekujących zamówień").assertExists()
             compose.onNodeWithTag("queue-produced-${order.id}").assertDoesNotExist()
+            if (route == "powder") {
+                compose.onNodeWithTag("queue-code-${order.id}").assert(hasText(productionDateCode(today.plusDays(1)))).performClick()
+                compose.onNodeWithTag("production-code-input").performTextClearance()
+                compose.onNodeWithTag("production-code-input").performTextInput("007")
+                compose.onNodeWithTag("production-code-save").performClick()
+                compose.waitUntil(10000) { compose.onAllNodesWithTag("production-code-input").fetchSemanticsNodes().isEmpty() }
+                compose.onNodeWithTag("queue-code-${order.id}").assert(hasText("007"))
+            }
             screenshot("plan-produkcja-$route")
             compose.onNodeWithTag("queue-list").performScrollToNode(hasTestTag("queue-hour-${today.plusDays(1)}-10"))
             dragCardToHour(order.id, 10)
@@ -525,7 +533,7 @@ class ProductionQueueUiTest {
             org.junit.Assert.assertNull(returned.scheduledTime)
             org.junit.Assert.assertEquals(java.math.BigDecimal("1000"), returned.plannedAmount)
             org.junit.Assert.assertEquals(1, compose.runOnIdle { model.state.value.completions.count { it.entryId == id } })
-            org.junit.Assert.assertEquals("Notatka przed wstrzymaniem", compose.runOnIdle { model.state.value.productNotes.single { it.entryId == id }.text })
+            org.junit.Assert.assertEquals("Notatka przed wstrzymaniem", compose.runOnIdle { model.state.value.productNotes.single { it.entryId == id && !it.isProductionCode() }.text })
             screenshot("powrot-do-oczekujacych-$route")
             compose.onNodeWithContentDescription("Wróć do kolejki produkcji").performClick()
         }

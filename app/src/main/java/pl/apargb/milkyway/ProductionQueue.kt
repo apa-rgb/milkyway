@@ -189,6 +189,7 @@ internal class ProductionQueueRepository(context: Context,
             }
             if (old == null) db.insertOrThrow("production_queue", null, values)
             else db.update("production_queue", values, "id = ?", arrayOf(id))
+            if (old != null && !pending) updateAutomaticProductionCode(db, id, line, date, old.pendingOrder, now)
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         return load()
@@ -210,9 +211,33 @@ internal class ProductionQueueRepository(context: Context,
                 put("plan_date", date.toString()); put("planned_time", time.toString()); put("pending_order", 0)
                 put("position", nextPosition(db, current.line, date)); put("updated_at", now)
             }, "id = ?", arrayOf(current.id))
+            updateAutomaticProductionCode(db, current.id, current.line, date, current.pendingOrder, now)
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
         return load()
+    }
+
+    /** Write the code in the same transaction as scheduling, retaining any explicit manual override. */
+    private fun updateAutomaticProductionCode(db: SQLiteDatabase, entryId: String, line: ProductionLine,
+                                               date: LocalDate, enteringProduction: Boolean, now: Long) {
+        if (line != ProductionLine.POWDER) return
+        val latest = db.query("production_product_notes", arrayOf("id", "note"), "entry_id = ?", arrayOf(entryId),
+            null, null, "created_at DESC, rowid DESC").use { cursor ->
+            var found: ProductNote? = null
+            while (cursor.moveToNext()) {
+                val note = ProductNote(cursor.getString(0), entryId, ProductNoteStage.PRODUCTION, cursor.getString(1), now)
+                if (note.isProductionCode()) { found = note; break }
+            }
+            found
+        }
+        if (latest == null && !enteringProduction || latest != null && !latest.isAutomaticProductionCode()) return
+        val code = productionDateCode(date)
+        if (latest != null && productionCode(listOf(latest), entryId) == code) return
+        db.insertOrThrow("production_product_notes", null, ContentValues().apply {
+            put("id", AUTOMATIC_PRODUCTION_CODE_PREFIX + java.util.UUID.randomUUID().toString())
+            put("entry_id", entryId); put("stage", ProductNoteStage.PRODUCTION.name)
+            put("note", "Kod produkcji: $code"); put("created_at", now)
+        })
     }
 
     /** Remove the remaining work from the daily plan, retaining the product and its execution history. */
