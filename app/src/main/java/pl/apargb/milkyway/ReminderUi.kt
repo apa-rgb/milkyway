@@ -70,9 +70,9 @@ internal fun ReminderButton(reminder: NoteReminder?, enabled: Boolean, tag: Stri
             modifier = Modifier.then(if (compact) Modifier.fillMaxWidth().heightIn(min = 44.dp) else Modifier)
                 .testTag(tag).semantics { toggleableState = if (active) ToggleableState.On else ToggleableState.Off },
             shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = if (compact) 4.dp else 12.dp, vertical = 8.dp),
-            border = BorderStroke(1.dp, if (active) ReminderActiveColor else MaterialTheme.colorScheme.outlineVariant),
-            colors = ButtonDefaults.outlinedButtonColors(containerColor = if (active) ReminderActiveColor.copy(alpha = .13f) else MaterialTheme.colorScheme.surface,
-                contentColor = if (active) ReminderActiveColor else MaterialTheme.colorScheme.onSurfaceVariant)) {
+            border = BorderStroke(1.dp, ReminderActiveColor.copy(alpha = if (active) 1f else .45f)),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = ReminderActiveColor.copy(alpha = if (active) .22f else .08f),
+                contentColor = ReminderActiveColor)) {
             if (!compact) { Icon(Icons.Outlined.NotificationsActive, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
             Text("Przypomnienie", fontSize = if (compact) 11.sp else 14.sp, maxLines = 1)
         }

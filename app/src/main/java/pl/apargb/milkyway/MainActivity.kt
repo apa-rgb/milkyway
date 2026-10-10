@@ -105,6 +105,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
     var sectionName by rememberSaveable { mutableStateOf(Section.Home.name) }
     var productionReturnSection by rememberSaveable { mutableStateOf(Section.Home.name) }
     var selectedShift by rememberSaveable { mutableIntStateOf(0) }
+    var pendingShift by rememberSaveable { mutableStateOf<Int?>(null) }
     var departmentName by rememberSaveable { mutableStateOf(Department.Reception.name) }
     var controlName by rememberSaveable { mutableStateOf<String?>(null) }
     var productionDestinationName by rememberSaveable { mutableStateOf(ProductionDestination.MENU.name) }
@@ -132,7 +133,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         if (!queue.loading && queue.loadError == null && (!cloud.configured || cloud.ready))
             ReminderScheduler.syncDomain(context, cloud.reminderReader, "production", productReminderItems(queue.entries, queue.productNotes))
     }
-    LaunchedEffect(due?.key) { if (due != null) { sectionName = Section.Home.name; labUnlocked = false } }
+    LaunchedEffect(due?.key) { if (due != null) { sectionName = Section.Home.name; labUnlocked = false; pendingShift = null } }
     val reminderOpen = (context as? MainActivity)?.reminderOpen
     val openRequest by (reminderOpen ?: remember { MutableStateFlow(0L) }).collectAsState()
     LaunchedEffect(openRequest) { if (openRequest > 0) sectionName = Section.Home.name }
@@ -253,7 +254,7 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     (1..3).forEach { shift ->
                                         ShiftSelectionCard(shift, selectedShift == shift, Modifier.weight(1f).testTag("home-shift-$shift"), compact = true) {
-                                            selectedShift = shift; sectionName = Section.Dashboard.name
+                                            pendingShift = shift
                                         }
                                     }
                                 }
@@ -305,6 +306,13 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                     }
                 }
             }
+        }
+    }
+    pendingShift?.let { shift ->
+        key(shift) {
+            ShiftAccessDialog(shift, onUnlock = {
+                selectedShift = shift; pendingShift = null; sectionName = Section.Dashboard.name
+            }, onClose = { pendingShift = null })
         }
     }
     if (editorTankId == null && routingTankId == null && oilTypeTankId == null && history.tankId == null && topUps.tankId == null) {

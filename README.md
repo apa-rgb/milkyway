@@ -1,5 +1,7 @@
 # Milkyway — aplikacja Android
 
+Wersja **0.7.16** zabezpiecza każde wejście do panelu zmiany 1–3 PIN-em **5522**. Błędny PIN i anulowanie pozostawiają ekran główny; wpisany kod nie jest zapisywany. Przyciski **Ważne**, **Przypomnienie** i **Załatwione** od początku mają odpowiednio czerwony, bursztynowy i zielony kolor, który staje się intensywniejszy po włączeniu. W formularzu produkcji **Masło** ma żółtą obwódkę, a **Mix** pomarańczową; wybrany rodzaj ma mocniejsze tło i ramkę.
+
 Wersja **0.7.15** nadaje notatkom delikatne pastelowe tła, aby łatwiej odróżnić wpisy na tablicy ogłoszeń, w panelach zmian, historii produktu i przypomnieniach. Kolor wynika ze stałego identyfikatora wpisu i pozostaje taki sam po edycji, zmianie kolejności oraz na innych urządzeniach. Załatwione notatki mają zielonkawy odcień, a ważna treść zachowuje czerwone oznaczenie.
 
 Wersja **0.7.14** porządkuje ekran główny: mniejszy kafelek **Dziennik produkcji** zawiera numer bieżącej wersji w prawym górnym rogu. Pod nim trzy zmiany mieszczą się w jednym wąskim rzędzie. Większy, prostokątny kafelek **Tablica ogłoszeń** zajmuje główną część menu; po prawej znajdują się **Produkcja** i pod nią **Magazyn/wyprodukowano**. **Inne** jest dostępne poniżej jako wąski przycisk. Dotychczasowa nawigacja i dane pozostają zachowane.

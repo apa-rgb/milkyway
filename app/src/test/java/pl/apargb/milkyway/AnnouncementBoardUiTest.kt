@@ -94,7 +94,7 @@ class AnnouncementBoardUiTest {
             bitmap.recycle()
         }
         compose.onNodeWithContentDescription("Wróć do ekranu głównego").performClick()
-        compose.onNodeWithText("Zmiana 2").performClick()
+        compose.openShift(2)
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
         compose.onNodeWithTag("home-Announcements").performClick()
         compose.onNodeWithText("Zaktualizowane ogłoszenie").assertExists()

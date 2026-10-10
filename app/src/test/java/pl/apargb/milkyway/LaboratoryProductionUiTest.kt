@@ -61,7 +61,7 @@ class LaboratoryProductionUiTest {
     }
 
     @Test fun laboratoryRequiresPinAndRelocksOnExitBackgroundAndRotation() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Laboratory").performScrollTo().performClick()
         compose.onNodeWithTag("lab-list").assertDoesNotExist()
         compose.onNodeWithTag("lab-pin").performTextInput("1111")
@@ -118,7 +118,7 @@ class LaboratoryProductionUiTest {
     }
 
     @Test fun productionTankEstimatesUseSavedAssumptionsAndUpdateAfterEditing() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Controls").performScrollTo().performClick()
         compose.onNodeWithTag("control-PRODUCTION").performClick()
         compose.onNodeWithTag("production-queue").assertIsDisplayed()

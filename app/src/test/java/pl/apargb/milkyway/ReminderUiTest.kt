@@ -50,7 +50,7 @@ class ReminderUiTest {
     }
 
     @Test fun dueNoteReturnsHomeUrgentTurnsRedAndOkPersistsAfterRestart() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         due()
         compose.onNodeWithTag("due-reminder-text").assertIsDisplayed()
@@ -80,7 +80,7 @@ class ReminderUiTest {
     }
 
     @Test fun bottomReminderPickerKeepsDraftAndScheduleAcrossRotation() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
         compose.onNodeWithText("Tytuł").assertDoesNotExist()
@@ -118,14 +118,14 @@ class ReminderUiTest {
     }
 
     @Test fun reminderInterruptedDraftRemainsAvailableAfterReadConfirmation() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
         compose.onNodeWithText("Treść / notatka").performTextInput("Wersja robocza do zachowania")
         due()
         compose.onNodeWithTag("reminder-read").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithTag("due-reminder").fetchSemanticsNodes().isEmpty() }
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Treść / notatka").assert(hasText("Wersja robocza do zachowania", substring = true))
         compose.onNodeWithText("Zapisz").performClick()
@@ -134,12 +134,12 @@ class ReminderUiTest {
     }
 
     @Test fun notificationReturnsHomeOnceAndDoesNotRedirectAgainOnRotation() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.runOnIdle { InstrumentationRegistry.getInstrumentation().callActivityOnNewIntent(compose.activity,
             Intent(compose.activity.intent).putExtra(ReminderScheduler.OPEN_HOME, true)) }
         compose.onNodeWithTag("home-Production").assertExists()
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
         compose.onNodeWithText("Treść / notatka").performTextInput("Po powiadomieniu")
@@ -149,7 +149,7 @@ class ReminderUiTest {
     }
 
     @Test fun threeBottomActionsKeepTheirStatesAfterRotationAndSaveWithoutAnAlarmWhenDone() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
         compose.onNodeWithText("Treść / notatka").performTextInput("Trzy przyciski w dolnej belce")

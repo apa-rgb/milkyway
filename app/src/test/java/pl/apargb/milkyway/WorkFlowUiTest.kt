@@ -75,9 +75,38 @@ class WorkFlowUiTest {
     }
 
     @Test
+    fun eachShiftRequiresPinAndRejectsIncorrectOrCancelledEntry() {
+        (1..3).forEach { shift ->
+            compose.onNodeWithTag("home-shift-$shift").performClick()
+            compose.onNodeWithTag("shift-lock").assertIsDisplayed()
+            compose.onNodeWithTag("menu-Notes").assertDoesNotExist()
+            compose.onNodeWithTag("shift-unlock").assertIsNotEnabled()
+            compose.onNodeWithTag("shift-pin").performTextInput("0000")
+            compose.onNodeWithTag("shift-unlock").performClick()
+            compose.onNodeWithText("Nieprawidłowy PIN.").assertIsDisplayed()
+            compose.onNodeWithTag("menu-Notes").assertDoesNotExist()
+            compose.onNodeWithTag("shift-pin").performTextInput("5522")
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithTag("shift-lock").assertIsDisplayed()
+            org.junit.Assert.assertEquals("", compose.onNodeWithTag("shift-pin").fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.EditableText].text)
+            compose.onNodeWithTag("shift-unlock").assertIsNotEnabled()
+            compose.onNodeWithText("Anuluj").performClick()
+            compose.onNodeWithTag("shift-lock").assertDoesNotExist()
+            compose.onNodeWithTag("menu-Notes").assertDoesNotExist()
+            compose.openShift(shift)
+            compose.onNodeWithText("Wybrana zmiana: $shift").assertExists()
+            compose.onNodeWithContentDescription("Zmień zmianę").performClick()
+            compose.onNodeWithTag("home-shift-$shift").performClick()
+            compose.onNodeWithTag("shift-unlock").assertIsNotEnabled()
+            compose.onNodeWithText("Anuluj").performClick()
+        }
+    }
+
+    @Test
     fun choosingShiftOpensPanelAndNotesCanBeEditedCompletedScopedAndRestored() {
         compose.onNodeWithTag("menu-Tanks").assertDoesNotExist()
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").assertIsDisplayed()
         listOf("Tanks", "Softlab", "Reminders", "Controls").forEach {
             compose.onNodeWithTag("menu-$it").performScrollTo().assertIsDisplayed()
@@ -127,13 +156,13 @@ class WorkFlowUiTest {
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
 
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
-        compose.onNodeWithText("Zmiana 2").performClick()
+        compose.openShift(2)
         compose.onNodeWithTag("menu-Reminders").performClick()
         compose.onNodeWithText("Brak wpisów").assertExists()
         compose.onNodeWithText("Sprawdź wyparkę").assertDoesNotExist()
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Controls").performScrollTo().performClick()
         compose.onNodeWithTag("control-CURRENT_NOTES").performClick()
         compose.onNodeWithText("Bieżąca notatka do zachowania").assertExists()
@@ -145,7 +174,7 @@ class WorkFlowUiTest {
     }
 
     @Test fun shiftPanelNotesCanBeSavedEditedAndOpenedFromBothShortcuts() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").assertIsDisplayed().performClick()
         compose.onNodeWithText("Wpisy dla zmiany 1").assertExists()
         addEntry("Informacja do przekazania", "Dodaj notatkę")
@@ -166,20 +195,20 @@ class WorkFlowUiTest {
         screenshot("notatki-zmiany")
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
-        compose.onNodeWithText("Zmiana 2").performClick()
+        compose.openShift(2)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Wpisy dla zmiany 2").assertExists()
         compose.onNodeWithText("Brak wpisów").assertExists()
         compose.onNodeWithText("Poprawiona informacja").assertDoesNotExist()
         compose.onNodeWithContentDescription("Wróć do panelu zmiany").performClick()
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Poprawiona informacja").assertExists()
     }
 
     @Test fun importantShiftNotesKeepTheirRedTextAfterReopeningAndCanBeUnmarked() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Notes").performClick()
         compose.onNodeWithText("Dodaj notatkę").performClick()
         compose.onNodeWithText("Treść / notatka").performTextInput("Sprawdzić parametry przed produkcją")

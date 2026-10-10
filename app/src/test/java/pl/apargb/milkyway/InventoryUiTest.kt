@@ -86,7 +86,7 @@ class InventoryUiTest {
 
     @Test fun chooseRouteTransferMaterialAndRestoreScreenAfterRotation() {
         screenshot("start")
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").assertExists()
         compose.onNodeWithTag("menu-Controls").assertExists()
         screenshot("shift-panel")
@@ -167,7 +167,7 @@ class InventoryUiTest {
     }
 
     @Test fun repeatedTopUpsShowResultingStockAndRemainVisibleAfterRotation() {
-        compose.onNodeWithText("Zmiana 2").performClick()
+        compose.openShift(2)
         compose.onNodeWithTag("menu-Tanks").performClick()
         compose.onNodeWithTag("department-Powder").performClick()
         compose.onNodeWithTag("tank-row-Silos 1").performClick()
@@ -228,7 +228,7 @@ class InventoryUiTest {
         }
         compose.runOnIdle { model.reload() }
         compose.waitUntil(timeoutMillis = 10000) { compose.runOnIdle { !model.state.value.loading } }
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").performClick()
         compose.onNodeWithTag("department-Powder").performClick()
         compose.onNodeWithTag("tank-row-Silos 1").performClick()
@@ -254,7 +254,7 @@ class InventoryUiTest {
     }
 
     @Test fun everyTankCanBeManuallyEditedAndButterFatIsSavedAndRestored() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithTag("tank-row-LBT 1").fetchSemanticsNodes().isNotEmpty() }
         Department.entries.forEach { department ->
@@ -327,7 +327,7 @@ class InventoryUiTest {
     }
 
     @Test fun eachDepartmentFitsOnOnePageAndRowRoutingKeepsStockUnchanged() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithTag("tank-row-LBT 1").fetchSemanticsNodes().isNotEmpty() }
         Department.entries.forEach { department ->
@@ -383,7 +383,7 @@ class InventoryUiTest {
     @Test
     @Config(qualifiers = "w360dp-h640dp-xhdpi")
     fun smallPhoneKeepsTabsVisibleAndCanScrollToLastTankAndOpenDetails() {
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").performScrollTo().performClick()
         compose.waitUntil(timeoutMillis = 10000) { compose.onAllNodesWithTag("tank-row-LBT 1").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("department-Powder").performClick()
@@ -472,7 +472,7 @@ class InventoryUiTest {
         }
         compose.onNodeWithContentDescription("Wróć do innych").performClick()
         compose.onNodeWithContentDescription("Wróć do ekranu głównego").performClick()
-        compose.onNodeWithText("Zmiana 1").performClick()
+        compose.openShift(1)
         compose.onNodeWithTag("menu-Tanks").performClick()
         compose.onNodeWithTag("department-Oils").assertIsSelected()
         compose.onNodeWithTag("tank-heading-Olej 12").assert(hasText("pusty"))

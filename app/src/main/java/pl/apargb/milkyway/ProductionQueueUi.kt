@@ -1,5 +1,6 @@
 package pl.apargb.milkyway
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,8 +52,13 @@ internal fun ProductionQueueEditor(id: String, initial: ProductionQueueEntry?, l
                     Text("Rodzaj produktu — wybierz Masło lub Mix", style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ButterProductKind.entries.forEach { kind ->
+                            val selected = butterKind == kind.name
+                            val color = if (kind == ButterProductKind.BUTTER) Color(0xFFAA7900) else Color(0xFFB95716)
                             FilterChip(butterKind == kind.name, onClick = { butterKind = kind.name; model.clearError() },
-                                enabled = !ui.saving, label = { Text(kind.title) }, modifier = Modifier.testTag("butter-kind-${kind.name}"))
+                                enabled = !ui.saving, label = { Text(kind.title) }, modifier = Modifier.testTag("butter-kind-${kind.name}"),
+                                border = BorderStroke(if (selected) 2.dp else 1.dp, color.copy(alpha = if (selected) 1f else .6f)),
+                                colors = FilterChipDefaults.filterChipColors(containerColor = color.copy(alpha = .08f), labelColor = color,
+                                    selectedContainerColor = color.copy(alpha = .22f), selectedLabelColor = color))
                         }
                     }
                 }

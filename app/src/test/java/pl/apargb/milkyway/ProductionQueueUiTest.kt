@@ -704,7 +704,7 @@ class ProductionQueueUiTest {
         compose.onNodeWithTag("home-Production").assertIsDisplayed()
         compose.onNodeWithTag("home-Completed").assertIsDisplayed()
         screenshot("start-produkcja-wyprodukowano")
-        compose.onNodeWithText("Zmiana 2").performClick()
+        compose.openShift(2)
         compose.onNodeWithTag("menu-Production").assertDoesNotExist()
         compose.onNodeWithContentDescription("Zmień zmianę").performClick()
         openQueue(); compose.onNodeWithTag("production-queue_butter").performClick()

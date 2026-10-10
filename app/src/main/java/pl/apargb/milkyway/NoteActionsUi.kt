@@ -37,9 +37,8 @@ internal fun NoteActionsBar(important: Boolean, completed: Boolean, reminder: No
 private fun NoteAction(label: String, selected: Boolean, enabled: Boolean, color: Color,
                        modifier: Modifier, onChange: (Boolean) -> Unit) {
     Surface(modifier.heightIn(min = 44.dp).toggleable(value = selected, enabled = enabled, role = Role.Button, onValueChange = onChange),
-        shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, if (selected) color else MaterialTheme.colorScheme.outlineVariant),
-        color = if (selected) color.copy(alpha = .13f) else MaterialTheme.colorScheme.surface,
-        contentColor = if (selected) color else MaterialTheme.colorScheme.onSurfaceVariant) {
+        shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, color.copy(alpha = if (selected) 1f else .45f)),
+        color = color.copy(alpha = if (selected) .22f else .08f), contentColor = color) {
         Box(Modifier.padding(horizontal = 4.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
             Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
         }
