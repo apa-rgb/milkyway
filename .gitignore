@@ -19,3 +19,8 @@ ios/Resources/MilkywayCloud.plist
 **/xcuserdata/
 *.ipa
 *.xcarchive/
+desktop/node_modules/
+desktop/dist/
+desktop/config/firebase.json
+desktop/test-results/
+cloud/database-rules-backup-*.json

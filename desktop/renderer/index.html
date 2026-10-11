@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-src 'none'">
+  <title>Milkyway — Zamówienia</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="login-screen" class="login-layout">
+    <section class="welcome"><img src="../assets/cow.png" class="welcome-cow" alt="Krówka Milkyway"><span class="eyebrow">MILKYWAY · KOMPUTER</span><h1>Zamówienia,<br>prosto do produkcji.</h1><p>Wspólna kolejka na komputerze i telefonie.<br>Od zamówienia po gotowy produkt w magazynie.</p><div class="welcome-lines"><span>Masłownia</span><span>Proszkownia</span><span>UHT</span></div></section>
+    <section class="login-panel"><div class="login-card"><span class="eyebrow">DZIEŃ DOBRY</span><h2>Zaloguj się</h2><p class="muted">Użyj swojego konta z aplikacji Milkyway.</p><form id="login-form">
+      <label>Konto operatora<select id="account" required></select></label>
+      <label>Hasło<input id="password" type="password" autocomplete="current-password" required></label>
+      <label>Twoje imię <span class="optional">opcjonalnie</span><input id="name" autocomplete="given-name" maxlength="60" placeholder="Imię przy notatkach"></label>
+      <p id="login-error" class="error" role="alert"></p><button id="login-button" type="submit" class="primary full">Zaloguj się <span aria-hidden="true">→</span></button>
+    </form><p class="small muted">Dostęp dla operatorów 01–10. Hasło nie jest zapisywane na komputerze.</p></div></section>
+  </div>
+  <div id="app-screen" class="app-layout" hidden>
+    <aside class="sidebar"><div class="brand"><img src="../assets/cow.png" alt=""><div><strong>Milkyway</strong><span>Zamówienia</span></div></div><p class="nav-heading">PANEL KOMPUTERA</p><nav><button data-tab="orders" class="nav-item active"><span aria-hidden="true">▤</span>Zamówienia</button><button data-tab="timeline" class="nav-item"><span aria-hidden="true">◷</span>Kolejka produkcji</button><button data-tab="warehouse" class="nav-item"><span aria-hidden="true">▦</span>Podgląd magazynu</button></nav><div class="sidebar-bottom"><div class="online-dot"><span></span>Wspólna baza Firebase</div><small id="version"></small></div></aside>
+    <main class="workspace"><header class="topbar"><div><span class="eyebrow">DZIENNIK PRODUKCJI</span><h1 id="page-title">Zamówienia</h1></div><div class="operator"><div><strong id="profile-name"></strong><span id="profile-account"></span></div><button id="logout" class="quiet">Wyloguj</button></div></header>
+      <div id="global-error" class="notice error-notice" role="alert" hidden></div><div id="success" class="notice success-notice" role="status" hidden></div>
+      <section id="orders-page"><div class="stats"><div><span>Oczekujące</span><strong id="count-pending">—</strong></div><div><span>W produkcji</span><strong id="count-production">—</strong></div><div><span>Wykonane</span><strong id="count-completed">—</strong></div><div class="sync-stat"><span id="sync-label">Pobieranie danych…</span><button id="refresh" class="quiet">Odśwież ↻</button></div></div>
+        <div class="orders-grid"><section class="panel order-panel"><div class="panel-heading"><span class="eyebrow">NOWE ZAMÓWIENIE</span><h2>Dodaj do oczekujących</h2><p class="muted">Numer zostanie nadany po zapisaniu.</p></div>
+          <form id="order-form"><fieldset id="order-fields"><div class="field-label">Dział produkcji</div><div class="line-buttons" role="group" aria-label="Dział produkcji"><button type="button" data-line="BUTTER" class="line-button selected">Masłownia</button><button type="button" data-line="POWDER" class="line-button">Proszkownia</button><button type="button" data-line="UHT" class="line-button">UHT</button></div>
+            <div id="butter-options"><div class="field-label">Rodzaj produktu <span class="required">*</span></div><div class="butter-buttons"><button type="button" data-kind="BUTTER" class="butter-choice butter">Masło</button><button type="button" data-kind="MIX" class="butter-choice mix">Mix</button></div></div>
+            <label>Nazwa produktu <span class="required">*</span><input id="product" maxlength="120" required placeholder="np. Masło 82%"></label>
+            <label><span id="quantity-label">Zamówiona masa [kg]</span> <span class="required">*</span><input id="quantity" inputmode="decimal" required placeholder="np. 1500"></label>
+            <label>Opis produktu <span class="optional">opcjonalnie</span><input id="description" maxlength="10000" placeholder="Opakowanie, wariant, specyfikacja"></label>
+            <label>Notatka <span class="optional">opcjonalnie</span><textarea id="note" maxlength="4000" rows="3" placeholder="Dodatkowe informacje dla produkcji"></textarea></label>
+            <label class="checkbox"><input id="important" type="checkbox">Ważna notatka</label>
+            <p id="order-error" class="error" role="alert"></p><button id="submit-order" class="primary full" type="submit">Wyślij zamówienie <span aria-hidden="true">→</span></button>
+            <p class="small muted form-footnote">Zapis trafia do oczekujących w aplikacji na telefonie.</p>
+          </fieldset></form>
+        </section><section class="panel list-panel"><div class="list-heading"><div><span class="eyebrow">ŚLEDZENIE REALIZACJI</span><h2>Złożone zamówienia</h2></div><span id="orders-total" class="badge">0</span></div><div class="filters"><select id="filter-line" aria-label="Filtr działu"><option value="">Wszystkie działy</option><option value="BUTTER">Masłownia</option><option value="POWDER">Proszkownia</option><option value="UHT">UHT</option></select><input id="search-orders" type="search" placeholder="Numer lub nazwa zamówienia" aria-label="Szukaj zamówienia"></div><div id="orders-list" class="orders-list" aria-live="polite"></div></section></div>
+      </section>
+      <section id="timeline-page" hidden>
+        <div class="warehouse-bar"><div><h2>Kolejka na osi czasu</h2><p class="muted">Zaplanowane rozpoczęcia · podgląd danych z aplikacji.</p></div><div class="calendar"><button id="queue-previous" class="quiet" aria-label="Poprzedni dzień kolejki">←</button><input id="queue-date" type="date" aria-label="Dzień kolejki"><button id="queue-next" class="quiet" aria-label="Następny dzień kolejki">→</button><button id="queue-today" class="quiet">Dzisiaj</button></div></div>
+        <div class="timeline-tools"><select id="queue-line" aria-label="Dział kolejki"><option value="">Wszystkie działy</option><option value="BUTTER">Masłownia</option><option value="POWDER">Proszkownia</option><option value="UHT">UHT</option></select><span id="queue-count" class="muted small"></span><button id="queue-refresh" class="quiet">Odśwież ↻</button></div>
+        <section class="panel timeline-panel"><div id="timeline-head" class="timeline-head"></div><div id="timeline-grid" class="timeline-grid" aria-live="polite"></div></section>
+      </section>
+      <section id="warehouse-page" hidden><div class="warehouse-bar"><div><h2>Magazyn / wyprodukowano</h2><p class="muted">Dzień produkcyjny: 09:00–09:00 następnego dnia.</p></div><div class="calendar"><button id="previous-day" class="quiet" aria-label="Poprzedni dzień">←</button><input id="warehouse-date" type="date" aria-label="Dzień magazynu"><button id="next-day" class="quiet" aria-label="Następny dzień">→</button><button id="current-day" class="quiet">Bieżący</button></div></div><div class="warehouse-legend"><span class="legend full-status">Całość</span><span class="legend partial-status">Częściowo</span><span class="legend excess-status">Nadmiar</span><span class="muted small">Podgląd wspólnych danych — także produkcji dodanej na telefonie.</span></div><section class="panel warehouse-panel"><div id="warehouse-list" aria-live="polite"></div></section></section>
+    </main>
+  </div>
+  <template id="order-card"><article class="order-card"><div class="order-card-top"><span class="order-number"></span><span class="order-status"></span></div><h3></h3><div class="order-meta"></div><div class="order-progress"></div><p class="order-note"></p></article></template>
+  <template id="warehouse-card"><article class="warehouse-card"><div><span class="order-number"></span><h3></h3><p class="warehouse-detail"></p></div><div class="warehouse-amount"><strong></strong><span></span></div></article></template>
+  <script src="app.js" defer></script>
+</body>
+</html>

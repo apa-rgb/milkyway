@@ -102,7 +102,7 @@ class SharedRowsTest {
                 .removeFromWarehouse("remove", "product", day, setOf("receipt"), "5522", 4L)
             SharedRows.capture(helper, SharedDomain.PRODUCTION, old, actor2, 5L)
         }
-        assertEquals(2L, updated["schema"])
+        assertEquals(3L, updated["schema"])
         ProductionQueueDatabase(context, null).useDatabase { helper ->
             SharedRows.restore(helper, SharedDomain.PRODUCTION, updated)
             val snapshot = ProductionQueueRepository(context, helper as ProductionQueueDatabase).snapshot()

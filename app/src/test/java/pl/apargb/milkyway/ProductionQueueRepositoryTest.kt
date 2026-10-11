@@ -600,6 +600,18 @@ class ProductionQueueRepositoryTest {
         assertEquals(saved, repository.snapshot())
     }
 
+    private fun removeNewOrderNumberForLegacyFixture(db: android.database.sqlite.SQLiteDatabase) {
+        db.execSQL("""CREATE TABLE legacy_queue (
+            id TEXT PRIMARY KEY, line TEXT NOT NULL, plan_date TEXT NOT NULL, position INTEGER NOT NULL,
+            title TEXT NOT NULL, description TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            planned_amount TEXT, produced_amount TEXT NOT NULL, unit TEXT NOT NULL,
+            pending_order INTEGER NOT NULL, planned_time TEXT, UNIQUE(line, plan_date, position)
+        )""")
+        db.execSQL("INSERT INTO legacy_queue SELECT id,line,plan_date,position,title,description,created_at,updated_at,planned_amount,produced_amount,unit,pending_order,planned_time FROM production_queue")
+        db.execSQL("DROP TABLE production_queue")
+        db.execSQL("ALTER TABLE legacy_queue RENAME TO production_queue")
+    }
+
     @Test fun schemaFourUpgradeRetainsProductionHistoryAndNotesAndAddsAnEmptyRejectRegister() {
         repository.save("a", ProductionLine.BUTTER, today, "Masło", "Opis", 100L, BigDecimal("1000"))
         val entry = repository.load().single()
@@ -608,6 +620,7 @@ class ProductionQueueRepositoryTest {
         val before = repository.snapshot()
         repository.close()
         context.openOrCreateDatabase(ProductionQueueDatabase.NAME, Context.MODE_PRIVATE, null).use { db ->
+            removeNewOrderNumberForLegacyFixture(db)
             db.execSQL("DROP TABLE production_rejects"); db.version = 4
         }
         repository = ProductionQueueRepository(context, today = { today })
@@ -625,6 +638,7 @@ class ProductionQueueRepositoryTest {
         context.openOrCreateDatabase(ProductionQueueDatabase.NAME, Context.MODE_PRIVATE, null).use { db ->
             db.execSQL("DROP TABLE production_product_notes")
             db.execSQL("DROP TABLE production_rejects")
+            removeNewOrderNumberForLegacyFixture(db)
             db.version = 3
         }
         repository = ProductionQueueRepository(context, today = { today })
@@ -689,6 +703,7 @@ class ProductionQueueRepositoryTest {
             db.execSQL("DROP TABLE production_completions")
             db.execSQL("ALTER TABLE old_completions RENAME TO production_completions")
             db.execSQL("CREATE INDEX production_completions_entry ON production_completions(entry_id)")
+            removeNewOrderNumberForLegacyFixture(db)
             db.version = 5
         }
         repository = ProductionQueueRepository(context, today = { today })

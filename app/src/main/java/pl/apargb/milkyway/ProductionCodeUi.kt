@@ -40,7 +40,7 @@ internal fun ProductionCodeDialog(entry: ProductionQueueEntry, ui: ProductionQue
             Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Kod produkcji", style = MaterialTheme.typography.headlineSmall)
-                Text(entry.title)
+                Text(entry.displayTitle)
                 OutlinedTextField(code, { code = it.filter { digit -> digit in '0'..'9' }.take(3); model.clearError() },
                     label = { Text("3 cyfry (opcjonalnie)") }, modifier = Modifier.fillMaxWidth().testTag("production-code-input"),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, enabled = !ui.saving)

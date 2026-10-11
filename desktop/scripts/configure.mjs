@@ -1,0 +1,15 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import { validateConfig } from '../src/client.mjs';
+const { values } = parseArgs({ options: { from: { type: 'string', default: '../firebase.properties' } } });
+const source = await readFile(resolve(values.from), 'utf8');
+let data;
+if (source.trim().startsWith('{')) data = JSON.parse(source);
+else data = Object.fromEntries(source.split(/\r?\n/).filter(line => line.includes('=') && !line.trim().startsWith('#')).map(line => { const at = line.indexOf('='); return [line.slice(0, at).trim(), line.slice(at + 1).trim()]; }));
+const config = validateConfig({ projectId: data.projectId, apiKey: data.apiKey, databaseUrl: data.databaseUrl, plantId: data.plantId });
+const output = fileURLToPath(new URL('../config/firebase.json', import.meta.url));
+await mkdir(dirname(output), { recursive: true });
+await writeFile(output, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
+console.log('Konfiguracja Windows przygotowana z ustawień Androida. Klucz i hasła nie zostały wyświetlone.');

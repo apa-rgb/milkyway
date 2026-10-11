@@ -1,0 +1,69 @@
+{
+  "name": "milkyway-orders",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zam\u00f3wienia Milkyway na Windows 10 i 11",
+  "author": "apa-rgb",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "configure": "node scripts/configure.mjs",
+    "test": "node --test test/core.test.mjs test/client.test.mjs",
+    "test:ui": "node --test test/ui.test.mjs",
+    "fixture": "node scripts/android-fixture.mjs",
+    "dist:win": "node scripts/check-config.mjs && node scripts/build-windows.cjs",
+    "test:emulators": "npm --prefix ../cloud run test:desktop"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "playwright": "1.64.0"
+  },
+  "build": {
+    "appId": "pl.apargb.milkyway.orders",
+    "productName": "Milkyway Zamowienia",
+    "asar": true,
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**",
+      "renderer/**",
+      "assets/cow.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "config/firebase.json",
+        "to": "firebase.json"
+      },
+      {
+        "from": "assets/cow.ico",
+        "to": "cow.ico"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/cow.ico",
+      "signExecutable": false
+    },
+    "nsis": {
+      "artifactName": "Milkyway-Zamowienia-${version}-Windows-x64.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "shortcutName": "Milkyway \u2014 Zam\u00f3wienia",
+      "installerIcon": "assets/cow.ico",
+      "uninstallerIcon": "assets/cow.ico",
+      "include": "assets/installer.nsh"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/apa-rgb/milkyway.git"
+  }
+}

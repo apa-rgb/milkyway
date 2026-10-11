@@ -69,7 +69,7 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                             shape = RoundedCornerShape(10.dp), color = entry.fulfilment.tint) {
                             Row(Modifier.padding(horizontal = 10.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(entry.title, fontWeight = FontWeight.Bold, color = entry.line.tone.accent,
+                                    Text(entry.displayTitle, fontWeight = FontWeight.Bold, color = entry.line.tone.accent,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(entry.line.title + entry.butterKind?.let { " · ${it.title}" }.orEmpty(), style = MaterialTheme.typography.labelSmall)
@@ -93,7 +93,7 @@ internal fun CompletedDayContent(date: LocalDate, line: ProductionLine?, ui: Pro
                                 }
                                 IconButton(onClick = { onNotes(entry.id) }, enabled = enabled,
                                     modifier = Modifier.size(32.dp).testTag("product-notes-${entry.id}")) {
-                                    Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.title}", Modifier.size(16.dp), tint = entry.line.tone.accent)
+                                    Icon(Icons.Outlined.NoteAlt, "Notatki: ${entry.displayTitle}", Modifier.size(16.dp), tint = entry.line.tone.accent)
                                 }
                             }
                         }

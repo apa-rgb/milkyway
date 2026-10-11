@@ -1,0 +1,118 @@
+{
+  "tables": {
+    "production_queue": {
+      "d2luZG93cy1vcmRlcjowMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDE": {
+        "id": "windows-order:00000000-0000-0000-0000-000000000001",
+        "line": "BUTTER",
+        "plan_date": "2026-10-11",
+        "position": 0,
+        "title": "Zamówienie BUTTER",
+        "description": "Rodzaj produktu: Mix\nOpakowanie 200 g",
+        "created_at": 1791712800000,
+        "updated_at": 1791712800000,
+        "planned_amount": "1250.5",
+        "produced_amount": "0",
+        "unit": "KG",
+        "pending_order": 1,
+        "order_number": 1,
+        "_rowid": 1,
+        "_actor": {
+          "uid": "windows-user",
+          "account": "01",
+          "at": 1791712800000
+        }
+      },
+      "d2luZG93cy1vcmRlcjowMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDI": {
+        "id": "windows-order:00000000-0000-0000-0000-000000000002",
+        "line": "POWDER",
+        "plan_date": "2026-10-11",
+        "position": 0,
+        "title": "Zamówienie POWDER",
+        "description": "Opakowanie 200 g",
+        "created_at": 1791712800000,
+        "updated_at": 1791712800000,
+        "planned_amount": "1250.5",
+        "produced_amount": "0",
+        "unit": "KG",
+        "pending_order": 1,
+        "order_number": 2,
+        "_rowid": 2,
+        "_actor": {
+          "uid": "windows-user",
+          "account": "01",
+          "at": 1791712800000
+        }
+      },
+      "d2luZG93cy1vcmRlcjowMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDM": {
+        "id": "windows-order:00000000-0000-0000-0000-000000000003",
+        "line": "UHT",
+        "plan_date": "2026-10-11",
+        "position": 0,
+        "title": "Zamówienie UHT",
+        "description": "Opakowanie 200 g",
+        "created_at": 1791712800000,
+        "updated_at": 1791712800000,
+        "planned_amount": "1250.5",
+        "produced_amount": "0",
+        "unit": "LITRES",
+        "pending_order": 1,
+        "order_number": 3,
+        "_rowid": 3,
+        "_actor": {
+          "uid": "windows-user",
+          "account": "01",
+          "at": 1791712800000
+        }
+      }
+    },
+    "production_product_notes": {
+      "d2luZG93cy1vcmRlci1ub3RlOndpbmRvd3Mtb3JkZXI6MDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAx": {
+        "id": "windows-order-note:windows-order:00000000-0000-0000-0000-000000000001",
+        "entry_id": "windows-order:00000000-0000-0000-0000-000000000001",
+        "stage": "ORDER",
+        "note": "[Ważne]\n[Autor: Anna]\nWażna dostawa dla klienta",
+        "created_at": 1791712800000,
+        "_rowid": 1,
+        "_actor": {
+          "uid": "windows-user",
+          "account": "01",
+          "at": 1791712800000
+        }
+      },
+      "d2luZG93cy1vcmRlci1ub3RlOndpbmRvd3Mtb3JkZXI6MDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAy": {
+        "id": "windows-order-note:windows-order:00000000-0000-0000-0000-000000000002",
+        "entry_id": "windows-order:00000000-0000-0000-0000-000000000002",
+        "stage": "ORDER",
+        "note": "[Ważne]\n[Autor: Anna]\nWażna dostawa dla klienta",
+        "created_at": 1791712800000,
+        "_rowid": 2,
+        "_actor": {
+          "uid": "windows-user",
+          "account": "01",
+          "at": 1791712800000
+        }
+      },
+      "d2luZG93cy1vcmRlci1ub3RlOndpbmRvd3Mtb3JkZXI6MDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAz": {
+        "id": "windows-order-note:windows-order:00000000-0000-0000-0000-000000000003",
+        "entry_id": "windows-order:00000000-0000-0000-0000-000000000003",
+        "stage": "ORDER",
+        "note": "[Ważne]\n[Autor: Anna]\nWażna dostawa dla klienta",
+        "created_at": 1791712800000,
+        "_rowid": 3,
+        "_actor": {
+          "uid": "windows-user",
+          "account": "01",
+          "at": 1791712800000
+        }
+      }
+    }
+  },
+  "schema": 3,
+  "orderSequence": 3,
+  "revision": 3,
+  "updatedAt": 1791712800000,
+  "actor": {
+    "uid": "windows-user",
+    "account": "01"
+  }
+}

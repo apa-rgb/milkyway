@@ -9,7 +9,7 @@ import java.util.Base64
 internal enum class SharedDomain(val path: String, val tables: List<String>, val schema: Int = 1) {
     INVENTORY("inventory", listOf("tank_states", "movements")),
     NOTES("notes", listOf("work_notes")),
-    PRODUCTION("production", listOf("production_queue", "production_completions", "production_product_notes", "production_rejects"), schema = 2);
+    PRODUCTION("production", listOf("production_queue", "production_completions", "production_product_notes", "production_rejects"), schema = 3);
 
     fun database(context: Context): SQLiteOpenHelper = when (this) {
         INVENTORY -> InventoryDatabase(context, null)
@@ -35,7 +35,7 @@ internal object SharedRows {
 
     fun restore(helper: SQLiteOpenHelper, domain: SharedDomain, snapshot: Map<String, Any?>) {
         val schema = (snapshot["schema"] as? Number)?.toInt()
-        require(snapshot.isEmpty() || schema == domain.schema || domain == SharedDomain.PRODUCTION && schema == 1) { "Zaktualizuj aplikację: inna wersja wspólnej bazy." }
+        require(snapshot.isEmpty() || schema == domain.schema || domain == SharedDomain.PRODUCTION && schema in 1..2) { "Zaktualizuj aplikację: inna wersja wspólnej bazy." }
         val tables = tables(snapshot)
         require(tables.keys.all { it in domain.tables }) { "Nieznana tabela wspólnej bazy." }
         val db = helper.writableDatabase
@@ -91,7 +91,7 @@ internal object SharedRows {
                 }
             }
         }
-        return mapOf("schema" to domain.schema.toLong(), "revision" to (((previous["revision"] as? Number)?.toLong() ?: 0L) + 1),
+        return previous + mapOf("schema" to domain.schema.toLong(), "revision" to (((previous["revision"] as? Number)?.toLong() ?: 0L) + 1),
             "updatedAt" to now, "actor" to actor, "tables" to tables)
     }
 

@@ -110,7 +110,7 @@ internal fun ProductionCompletionDialog(entry: ProductionQueueEntry, ui: Product
     val requestId = rememberSaveable { UUID.randomUUID().toString() }
     val remaining = entry.remainingAmount ?: return
     LaunchedEffect(ui.lastSavedRequestId) { if (ui.lastSavedRequestId == requestId) onClose() }
-    TankFormDialog("Wyprodukowano: ${entry.title}", saving = ui.saving, canSave = full || amount.isNotBlank(),
+    TankFormDialog("Wyprodukowano: ${entry.displayTitle}", saving = ui.saving, canSave = full || amount.isNotBlank(),
         onClose = onClose, onSave = {
             try {
                 model.recordProduction(requestId, entry, if (full) null else parseDecimal(amount, "Wyprodukowana ilość", required = true))
@@ -153,7 +153,7 @@ internal fun ProductionCompletionBubble(entry: ProductionQueueEntry, ui: Product
     Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Wyprodukowano", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(entry.title, color = entry.line.tone.accent)
+        Text(entry.displayTitle, color = entry.line.tone.accent)
         Text("Pozostało: ${remaining?.let(::decimalLabel) ?: "—"} ${entry.unit.label}", style = MaterialTheme.typography.bodySmall)
         if (allowed) {
             NumberField("Wyprodukowano teraz [${entry.unit.label}]", amount, !ui.saving) { amount = it; model.clearError() }

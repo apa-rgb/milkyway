@@ -114,7 +114,7 @@ internal fun ProductionCompletedPage(ui: ProductionQueueState, model: Production
     }
     products.find { it.entry.id == removingId }?.let { product -> key(removalRequest) {
         WarehouseDeleteDialog("Usunąć wpis z magazynu?",
-            "${product.entry.title}\n${decimalLabel(product.amount)} ${product.entry.unit.label} · ${queueDateLabel(date)}\nHistoria wykonanej produkcji zostaje zachowana.",
+            "${product.entry.displayTitle}\n${decimalLabel(product.amount)} ${product.entry.unit.label} · ${queueDateLabel(date)}\nHistoria wykonanej produkcji zostaje zachowana.",
             ui.saving, ui.operationError, "warehouse-delete-confirm",
             onDelete = { pin -> removalRequest?.let { model.removeFromWarehouse(it, product, date, pin) } },
             onClose = { removingId = null; removalRequest = null; model.clearError() })
@@ -144,7 +144,7 @@ internal fun completedOrderLabel(entry: ProductionQueueEntry) = "Zamówiono: ${e
 @Composable
 private fun CompletedProductDetails(product: CompletedDayProduct, date: LocalDate, enabled: Boolean, onDelete: () -> Unit, onClose: () -> Unit) {
     val entry = product.entry
-    AlertDialog(onDismissRequest = onClose, title = { Text(entry.title) }, text = {
+    AlertDialog(onDismissRequest = onClose, title = { Text(entry.displayTitle) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()).testTag("completed-details"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${entry.line.title} · ${queueDateLabel(date)}")
             entry.butterKind?.let { Text("Rodzaj produktu: ${it.title}") }

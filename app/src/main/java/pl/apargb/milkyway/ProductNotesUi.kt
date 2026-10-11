@@ -28,7 +28,7 @@ internal fun ProductNotesDialog(entry: ProductionQueueEntry, stage: ProductNoteS
             "product-note-important", "product-note-completed", onImportant = { important = it }, onCompleted = { completed = it },
             onReminder = { reminderMetadata = withNoteReminder("", NoteReminder(it)); completed = false }) }, content = {
             Column(Modifier.testTag("product-notes-dialog"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(entry.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
+                Text(entry.displayTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = entry.line.tone.accent)
                 Text("${entry.line.title} · ${stage.title}", style = MaterialTheme.typography.bodySmall)
                 NoteAuthorLabel(currentNoteAuthor(), Modifier.testTag("product-note-new-author"))
                 OutlinedTextField(text, onValueChange = { text = it.take(4000); model.clearError() }, label = { Text("Nowa notatka", style = MaterialTheme.typography.bodySmall) },

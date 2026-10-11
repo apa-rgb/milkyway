@@ -21,7 +21,9 @@ data class ProductionQueueEntry(val id: String, val line: ProductionLine, val da
                                 val createdAt: Long, val updatedAt: Long,
                                 val plannedAmount: BigDecimal? = null, val producedAmount: BigDecimal = BigDecimal.ZERO,
                                 val unit: ProductionQuantityUnit = line.defaultUnit,
-                                val pendingOrder: Boolean = false, val scheduledTime: LocalTime? = null) {
+                                val pendingOrder: Boolean = false, val scheduledTime: LocalTime? = null,
+                                val orderNumber: Long? = null) {
+    val displayTitle: String get() = orderNumber?.let { "#%06d · %s".format(java.util.Locale.ROOT, it, title) } ?: title
     // Pending orders retain their receipt day in date; only scheduled entries belong to a daily plan.
     val productionDate: LocalDate? get() = if (pendingOrder) null else date
     val remainingAmount: BigDecimal? get() = plannedAmount?.subtract(producedAmount)?.max(BigDecimal.ZERO)
@@ -39,14 +41,14 @@ data class RejectedGoods(val id: String, val line: ProductionLine, val date: Loc
 internal data class ProductionQueueSnapshot(val entries: List<ProductionQueueEntry>, val completions: List<ProductionCompletion>,
                                             val productNotes: List<ProductNote>, val rejectedGoods: List<RejectedGoods>)
 
-internal class ProductionQueueDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 6) {
+internal class ProductionQueueDatabase(context: Context, name: String? = NAME) : SQLiteOpenHelper(context, name, null, 7) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE production_queue (
             id TEXT PRIMARY KEY, line TEXT NOT NULL CHECK(line IN ('BUTTER', 'POWDER', 'UHT')),
             plan_date TEXT NOT NULL, position INTEGER NOT NULL CHECK(position >= 0),
             title TEXT NOT NULL, description TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
             planned_amount TEXT, produced_amount TEXT NOT NULL DEFAULT '0', unit TEXT NOT NULL DEFAULT 'KG',
-            pending_order INTEGER NOT NULL DEFAULT 0 CHECK(pending_order IN (0, 1)), planned_time TEXT,
+            pending_order INTEGER NOT NULL DEFAULT 0 CHECK(pending_order IN (0, 1)), planned_time TEXT, order_number INTEGER CHECK(order_number > 0),
             UNIQUE(line, plan_date, position)
         )""")
         createCompletions(db)
@@ -55,7 +57,7 @@ internal class ProductionQueueDatabase(context: Context, name: String? = NAME) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        check(oldVersion in 1..5 && newVersion == 6)
+        check(oldVersion in 1..6 && newVersion == 7)
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE production_queue ADD COLUMN planned_amount TEXT")
             db.execSQL("ALTER TABLE production_queue ADD COLUMN produced_amount TEXT NOT NULL DEFAULT '0'")
@@ -70,6 +72,7 @@ internal class ProductionQueueDatabase(context: Context, name: String? = NAME) :
         }
         if (oldVersion < 4) createProductNotes(db)
         if (oldVersion < 5) createRejectedGoods(db)
+        if (oldVersion < 7) db.execSQL("ALTER TABLE production_queue ADD COLUMN order_number INTEGER CHECK(order_number > 0)")
         if (oldVersion < 6) {
             val columns = db.rawQuery("PRAGMA table_info(production_completions)", null).use { cursor ->
                 buildSet { while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("name"))) }
@@ -533,7 +536,8 @@ private fun Cursor.entry(): ProductionQueueEntry {
         long("position"), string("title"), string("description"), long("created_at"), long("updated_at"),
         getColumnIndexOrThrow("planned_amount").let { if (isNull(it)) null else getString(it).toBigDecimal() },
         string("produced_amount").toBigDecimal(), ProductionQuantityUnit.valueOf(string("unit")), long("pending_order") == 1L,
-        getColumnIndexOrThrow("planned_time").let { if (isNull(it)) null else LocalTime.parse(getString(it)) })
+        getColumnIndexOrThrow("planned_time").let { if (isNull(it)) null else LocalTime.parse(getString(it)) },
+        getColumnIndexOrThrow("order_number").let { if (isNull(it)) null else getLong(it) })
 }
 
 internal fun validateProductionAmount(amount: BigDecimal) {

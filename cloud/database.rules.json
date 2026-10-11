@@ -8,7 +8,7 @@
           "$domain": {
             ".read": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|10)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory')",
             ".write": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|10)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory') && ($domain == 'inventory' || $domain == 'production' || $domain == 'notes') && newData.exists() && newData.child('actor/uid').val() == auth.uid && newData.child('actor/account').val() == auth.token.account",
-            ".validate": "(($domain == 'production' && newData.child('schema').val() == 2) || ($domain != 'production' && newData.child('schema').val() == 1)) && newData.child('revision').isNumber() && newData.child('updatedAt').isNumber()",
+            ".validate": "(($domain == 'production' && newData.child('schema').val() == 3) || ($domain != 'production' && newData.child('schema').val() == 1)) && newData.child('revision').isNumber() && newData.child('updatedAt').isNumber() && (!data.child('orderSequence').exists() || (newData.child('orderSequence').exists() && newData.child('orderSequence').val() >= data.child('orderSequence').val())) && (!newData.child('orderSequence').exists() || (newData.child('orderSequence').isNumber() && newData.child('orderSequence').val() >= 0 && newData.child('orderSequence').val() <= 9007199254740991))",
             "tables": {
               "tank_states": {
                 "$tank": {
@@ -17,7 +17,7 @@
               },
               "movements": { "$row": { ".validate": "$domain == 'inventory' && newData.child('id').isString() && newData.child('litres').isString()" } },
               "work_notes": { "$row": { ".validate": "$domain == 'notes' && newData.child('id').isString() && newData.child('title').isString() && newData.child('scope').isNumber() && newData.child('scope').val() >= 0 && newData.child('scope').val() <= 3" } },
-              "production_queue": { "$row": { ".validate": "$domain == 'production' && newData.child('id').isString() && newData.child('produced_amount').isString()" } },
+              "production_queue": { "$row": { ".validate": "$domain == 'production' && newData.child('id').isString() && newData.child('produced_amount').isString() && (!data.child('order_number').exists() || newData.child('order_number').val() == data.child('order_number').val()) && (!newData.child('order_number').exists() || (newData.child('order_number').isNumber() && newData.child('order_number').val() > 0 && newData.child('order_number').val() <= newData.parent().parent().parent().child('orderSequence').val()))" } },
               "production_completions": { "$row": { ".validate": "$domain == 'production' && newData.child('id').isString() && newData.child('amount').isString() && newData.child('entry_id').isString()" } },
               "production_product_notes": { "$row": { ".validate": "$domain == 'production' && newData.child('id').isString() && newData.child('note').isString()" } },
               "production_rejects": { "$row": { ".validate": "$domain == 'production' && newData.child('id').isString() && newData.child('kilograms').isString()" } },

@@ -27,7 +27,7 @@ test('two authenticated operators see live changes, concurrent execution retries
   const orderKey = Buffer.from('order').toString('base64url');
   try {
     const first = await client('first', '01'), second = await client('second', '02');
-    await set(domain(first), { schema: 2, revision: 1, updatedAt: Date.now(), actor: actor(first), tables: {
+    await set(domain(first), { schema: 3, revision: 1, updatedAt: Date.now(), actor: actor(first), tables: {
       production_queue: { [orderKey]: { id: 'order', produced_amount: '0', planned_amount: '1000' } }
     } });
     const seen = new Promise((resolve, reject) => {
@@ -54,6 +54,22 @@ test('two authenticated operators see live changes, concurrent execution retries
     const final = (await get(domain(second))).val();
     assert.equal(final.tables.production_queue[orderKey].produced_amount, '750');
     assert.equal(Object.keys(final.tables.production_completions).length, 2);
+    const numbered = structuredClone(final); numbered.orderSequence = 1;
+    numbered.actor = actor(first); numbered.tables.production_queue[orderKey].order_number = 1;
+    await set(domain(first), numbered);
+    const oldSchema = { ...numbered, schema: 2 };
+    await assert.rejects(set(domain(first), oldSchema));
+    const missingNumber = structuredClone(numbered); delete missingNumber.tables.production_queue[orderKey].order_number;
+    await assert.rejects(set(domain(first), missingNumber));
+    const changedNumber = structuredClone(numbered); changedNumber.orderSequence = 2; changedNumber.tables.production_queue[orderKey].order_number = 2;
+    await assert.rejects(set(domain(first), changedNumber));
+    const missingCounter = structuredClone(numbered); delete missingCounter.orderSequence;
+    await assert.rejects(set(domain(first), missingCounter));
+    const lowerCounter = { ...numbered, orderSequence: 0 };
+    await assert.rejects(set(domain(first), lowerCounter));
+    const deletedOrder = structuredClone(numbered); delete deletedOrder.tables.production_queue[orderKey];
+    await set(domain(first), deletedOrder); // Deletion preserves the high-water counter and receipt ledger.
+    assert.equal((await get(domain(second))).val().orderSequence, 1);
     const outsider = await client('outsider', '03', 'other');
     await assert.rejects(get(domain(outsider)));
     const tankKey = Buffer.from('LBT 1').toString('base64url');

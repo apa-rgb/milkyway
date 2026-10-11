@@ -36,7 +36,7 @@ Konfigurator tworzy `firebase.properties` i celowo nie nadpisuje istniejącego p
 
 Wspólne dane: zbiorniki, ruchy i dolewania, przypomnienia i notatki zmian, zamówienia i plan, wykonania, notatki produktów oraz wybrakowany towar. Nasłuchiwanie Firebase odświeża widoki po wpisach innego operatora. Transakcje przeliczają stan na aktualnych danych i są ponawiane przy równoczesnych zapisach. Transfer zmienia oba zbiorniki i historię razem. Identyfikatory wykonań zapobiegają podwójnemu naliczeniu ponowionego wpisu. Ilości dziesiętne są tekstem, aby nie traciły dokładności.
 
-Przy zmienionych wierszach zapisujemy autora, numer konta i czas w `_actor`. Wersja schematu jest sprawdzana przed odczytem. W aplikacji 0.7.1 domena produkcji zapisuje schemat **2** z oznaczeniami usunięcia z widoku magazynu; zbiorniki i notatki zachowują schemat **1**. Nowa aplikacja wczytuje również wcześniejszy schemat produkcji 1. Przed aktywacją należy wdrożyć aktualne `database.rules.json`, a urządzenia z dostępem do produkcji zaktualizować do 0.7.1. W ten sposób starsza aplikacja nie może nadpisać oznaczeń usunięcia. Usuwanie nie zmienia ilości wyprodukowanej i zachowuje zapisy wykonania; po podłączeniu Firebase oznaczenia trafiają do wspólnej bazy. Reguły ograniczają dostęp do zakładu użytkownika i chronią znaczniki pomiarów laboratoryjnych. Żadne z dziesięciu kont nie jest kontem Laboratorium; lokalny PIN nie nadaje uprawnień chmurowych.
+Przy zmienionych wierszach zapisujemy autora, numer konta i czas w `_actor`. Wersja schematu jest sprawdzana przed odczytem. W aplikacji **0.7.22** domena produkcji zapisuje schemat **3**: zachowuje numery zamówień z Windows, wspólny licznik `orderSequence` oraz oznaczenia usunięcia z widoku magazynu. Zbiorniki i notatki zachowują schemat **1**. Nowa aplikacja wczytuje wcześniejsze schematy produkcji 1 i 2. Najpierw zaktualizuj wszystkie telefony do 0.7.22, a następnie wdroż aktualne `database.rules.json`. Reguły odrzucają starszy schemat, zmianę istniejącego numeru i cofnięcie licznika. Moduł Windows i instrukcja aktualizacji: [desktop/README.md](../desktop/README.md). Usuwanie nie zmienia ilości wyprodukowanej i zachowuje zapisy wykonania; po podłączeniu Firebase oznaczenia trafiają do wspólnej bazy. Reguły ograniczają dostęp do zakładu użytkownika i chronią znaczniki pomiarów laboratoryjnych. Żadne z dziesięciu kont nie jest kontem Laboratorium; lokalny PIN nie nadaje uprawnień chmurowych.
 
 Bez internetu można przeglądać pobrane wcześniej dane. Nowy zapis wymaga połączenia; brak internetu przed zapisem zwraca komunikat i zachowuje formularz. Gdy połączenie zniknie podczas transakcji, aplikacja czeka na potwierdzenie i pokazuje stan oczekiwania. Nie ogłasza niepotwierdzonego wpisu jako zakończonej produkcji. Firebase nie zachowuje oczekujących transakcji po zamknięciu procesu – po ponownym uruchomieniu sprawdź rejestr przed ponowieniem wpisu.
 
@@ -51,6 +51,7 @@ cd /workspace/milkyway/cloud
 npm test
 npm run test:auth
 npm run test:emulators
+npm run test:desktop
 ```
 
 `npm test` sprawdza dokładnie dziesięć kont, ochronę istniejących kont i konfigurację Androida. `test:auth` uruchamia emulator Firebase Auth: loguje każde konto, sprawdza role operatorów, błędne hasło, plik haseł i ponowienie tworzenia. Testowe dane są lokalne i usuwane.
@@ -60,3 +61,5 @@ npm run test:emulators
 Androidowe `SharedRowsTest` sprawdzają wspólny stan, transfery, dokładność ilości, paginację, autorów i wykonania dwóch operatorów. `CloudLoginUiTest` sprawdza wybór konta 10 i obsługę hasła. Testy te nie zastępują próby skonfigurowanego APK na dwóch telefonach.
 
 **Stan:** kod i skrypty są przygotowane. Produkcyjny projekt, konta i synchronizacja na telefonach pozostają nieaktywne do czasu podłączenia Google Cloud i prawdziwej konfiguracji Firebase. Bootstrap tworzący produkcyjny projekt nie został uruchomiony bez poświadczeń.
+
+`test:desktop` sprawdza zapisy REST z rzeczywistymi regułami na lokalnym emulatorze: równoczesne zamówienia, numerację, ponowienia, ochronę licznika i odrzucenie starego schematu. W środowisku z proxy jest alternatywą dla testu SDK WebSocket, który nie uwzględnia NO_PROXY. Nie uruchamiaj go jednocześnie z testem okien Electron — oba zajmują porty 9099 i 9000.
