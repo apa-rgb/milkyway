@@ -11,15 +11,32 @@
   <div id="login-screen" class="login-layout">
     <section class="welcome"><img src="../assets/cow.png" class="welcome-cow" alt="Krówka Milkyway"><span class="eyebrow">MILKYWAY · KOMPUTER</span><h1>Zamówienia,<br>prosto do produkcji.</h1><p>Wspólna kolejka na komputerze i telefonie.<br>Od zamówienia po gotowy produkt w magazynie.</p><div class="welcome-lines"><span>Masłownia</span><span>Proszkownia</span><span>UHT</span></div></section>
     <section class="login-panel"><div class="login-card"><span class="eyebrow">DZIEŃ DOBRY</span><h2>Zaloguj się</h2><p class="muted">Użyj swojego konta z aplikacji Milkyway.</p><form id="login-form">
-      <label>Konto operatora<select id="account" required></select></label>
+      <label>Login (6 znaków)<select id="account" required></select></label>
       <label>Hasło<input id="password" type="password" autocomplete="current-password" required></label>
+      <label>E-mail przypisany do konta<input id="email" type="email" maxlength="254" autocomplete="email" placeholder="Puste przy pierwszym logowaniu"></label>
+      <p class="small muted">Po przypisaniu e-maila podaj go raz na nowym urządzeniu. Adres zostanie zapamiętany.</p>
       <label>Twoje imię <span class="optional">opcjonalnie</span><input id="name" autocomplete="given-name" maxlength="60" placeholder="Imię przy notatkach"></label>
       <p id="login-error" class="error" role="alert"></p><button id="login-button" type="submit" class="primary full">Zaloguj się <span aria-hidden="true">→</span></button>
-    </form><p class="small muted">Dostęp dla operatorów 01–10. Hasło nie jest zapisywane na komputerze.</p></div></section>
+    </form><p id="login-message" class="small" role="status"></p><button id="reset-open" class="quiet" type="button">Nie pamiętam hasła</button><p class="small muted">Loginy oper01–oper20. Hasło nie jest zapisywane na komputerze.</p></div></section>
   </div>
+  <dialog id="password-dialog" class="account-dialog"><form id="password-form">
+    <h2>Zmień hasło</h2><p id="password-explanation" class="muted"></p>
+    <p class="small muted">Dokładnie 8 liter i cyfr, w tym co najmniej jedna litera i jedna cyfra. Zmiana obowiązuje również w Androidzie.</p>
+    <label>Obecne hasło<input id="current-password" type="password" autocomplete="current-password" required></label>
+    <label>Nowe hasło<input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="8" pattern="(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{8}" required></label>
+    <label>Powtórz hasło<input id="repeat-password" type="password" autocomplete="new-password" minlength="8" maxlength="8" required></label>
+    <label>E-mail do resetowania hasła<input id="recovery-email" type="email" autocomplete="email" maxlength="254" required></label>
+    <p class="small muted">Otwórz link potwierdzający z wiadomości e-mail, aby włączyć odzyskiwanie dostępu.</p>
+    <p id="password-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" id="password-close" class="quiet">Anuluj</button><button id="password-save" class="primary" type="submit">Zmień i zapisz</button></div>
+  </form></dialog>
+  <dialog id="reset-dialog" class="account-dialog"><form id="reset-form"><h2>Reset hasła</h2>
+    <p class="muted">Podaj potwierdzony e-mail przypisany do konta. Wyślemy link do ustawienia nowego hasła.</p>
+    <label>E-mail do resetu<input id="reset-email" type="email" autocomplete="email" maxlength="254" required></label>
+    <p id="reset-message" class="small" role="status"></p><div class="dialog-actions"><button id="reset-close" class="quiet" type="button">Zamknij</button><button id="reset-send" class="primary" type="submit">Wyślij link</button></div>
+  </form></dialog>
   <div id="app-screen" class="app-layout" hidden>
     <aside class="sidebar"><div class="brand"><img src="../assets/cow.png" alt=""><div><strong>Milkyway</strong><span>Zamówienia</span></div></div><p class="nav-heading">PANEL KOMPUTERA</p><nav><button data-tab="orders" class="nav-item active"><span aria-hidden="true">▤</span>Zamówienia</button><button data-tab="timeline" class="nav-item"><span aria-hidden="true">◷</span>Kolejka produkcji</button><button data-tab="warehouse" class="nav-item"><span aria-hidden="true">▦</span>Podgląd magazynu</button></nav><div class="sidebar-bottom"><div class="online-dot"><span></span>Wspólna baza Firebase</div><small id="version"></small></div></aside>
-    <main class="workspace"><header class="topbar"><div><span class="eyebrow">DZIENNIK PRODUKCJI</span><h1 id="page-title">Zamówienia</h1></div><div class="operator"><div><strong id="profile-name"></strong><span id="profile-account"></span></div><button id="logout" class="quiet">Wyloguj</button></div></header>
+    <main class="workspace"><header class="topbar"><div><span class="eyebrow">DZIENNIK PRODUKCJI</span><h1 id="page-title">Zamówienia</h1></div><div class="operator"><div><strong id="profile-name"></strong><span id="profile-account"></span></div><button id="password-open" class="quiet">Zmień hasło</button><button id="logout" class="quiet">Wyloguj</button></div></header>
       <div id="global-error" class="notice error-notice" role="alert" hidden></div><div id="success" class="notice success-notice" role="status" hidden></div>
       <section id="orders-page"><div class="stats"><div><span>Oczekujące</span><strong id="count-pending">—</strong></div><div><span>W produkcji</span><strong id="count-production">—</strong></div><div><span>Wykonane</span><strong id="count-completed">—</strong></div><div class="sync-stat"><span id="sync-label">Pobieranie danych…</span><button id="refresh" class="quiet">Odśwież ↻</button></div></div>
         <div class="orders-grid"><section class="panel order-panel"><div class="panel-heading"><span class="eyebrow">NOWE ZAMÓWIENIE</span><h2>Dodaj do oczekujących</h2><p class="muted">Numer zostanie nadany po zapisaniu.</p></div>

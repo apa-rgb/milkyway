@@ -24,3 +24,7 @@ desktop/dist/
 desktop/config/firebase.json
 desktop/test-results/
 cloud/database-rules-backup-*.json
+
+cloud/hasla-*.csv
+cloud/.env*
+cloud/polityka-hasel-*.json

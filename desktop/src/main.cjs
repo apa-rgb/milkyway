@@ -32,6 +32,8 @@ app.whenReady().then(async () => {
       if (!client) throw new Error(configurationError);
       switch (command) {
         case 'login': return { ok: true, value: await client.login(input) };
+        case 'password': return { ok: true, value: await client.changePassword(input) };
+        case 'reset': return { ok: true, value: await client.resetPassword(input?.email) };
         case 'logout': client.logout(); return { ok: true };
         case 'view': return { ok: true, value: await client.view(input?.day, input?.queueDay) };
         case 'submit':

@@ -1,8 +1,8 @@
 {
   "name": "milkyway-orders",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "Zam\u00f3wienia Milkyway na Windows 10 i 11",
+  "description": "Zamówienia Milkyway na Windows 10 i 11",
   "author": "apa-rgb",
   "main": "src/main.cjs",
   "scripts": {
@@ -56,7 +56,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
-      "shortcutName": "Milkyway \u2014 Zam\u00f3wienia",
+      "shortcutName": "Milkyway — Zamówienia",
       "installerIcon": "assets/cow.ico",
       "uninstallerIcon": "assets/cow.ico",
       "include": "assets/installer.nsh"

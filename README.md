@@ -1,3 +1,5 @@
+Aktualizacja logowania: [20 kont oper01–oper20, zmiana hasła i reset e-mail na bezpłatnym Firebase](cloud/20-KONT.md). Wymaga nowych reguł, migracji kont i aktualizacji wszystkich aplikacji.
+
 # Milkyway — aplikacja Android
 
 Wersja **0.7.22** obsługuje stałe numery zamówień wysyłanych z nowego modułu **Windows 10/11**. Numer jest widoczny w kolejce, notatkach produktu i magazynie; zachowuje się po edycji oraz częściowym wykonaniu. Moduł komputerowy dodaje zamówienia do oczekujących, pokazuje ich realizację, wspólny magazyn i kolejkę na osi czasu. Wymagana jest aktualizacja reguł Firebase do schematu produkcji 3 oraz wszystkich telefonów. Instrukcja: [desktop/README.md](desktop/README.md).

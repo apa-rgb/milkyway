@@ -1,6 +1,8 @@
+Aktualizacja 0.1.1: loginy `oper01`–`oper20`, pierwsza zmiana hasła, ustawienia konta i reset e-mail. [Wdrożenie 20 kont i ograniczenia bezpłatnego planu](../cloud/20-KONT.md). Po powiązaniu e-maila podaj go raz na nowym komputerze; hasło nie jest zapamiętywane.
+
 # Milkyway — Zamówienia na Windows 10/11
 
-Osobna aplikacja dla Windows **x64**, instalowana dla bieżącego użytkownika, ze skrótem z krówką na pulpicie. Korzysta z tych samych kont operatorów **01–10** i tego samego zakładu Firebase co Android. Formularz wysyła nazwę, ilość, opis i opcjonalną ważną notatkę z autorem do **oczekujących** Masłowni, Proszkowni lub UHT. Masłownia wymaga wyboru Masło/Mix. Ilości są w kg, a UHT w litrach.
+Osobna aplikacja dla Windows **x64**, instalowana dla bieżącego użytkownika, ze skrótem z krówką na pulpicie. Korzysta z tych samych kont operatorów **oper01–oper20** i tego samego zakładu Firebase co Android. Formularz wysyła nazwę, ilość, opis i opcjonalną ważną notatkę z autorem do **oczekujących** Masłowni, Proszkowni lub UHT. Masłownia wymaga wyboru Masło/Mix. Ilości są w kg, a UHT w litrach.
 
 ## Uruchomienie wspólnej pracy
 

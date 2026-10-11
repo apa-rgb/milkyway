@@ -1,3 +1,6 @@
+export const normalizeEmail = value => typeof value === 'string' ? value.trim().toLowerCase() : '';
+export const validEmail = value => typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && !value.endsWith('.accounts.invalid');
+export const validPassword = value => typeof value === 'string' && /^[A-Za-z0-9]{8}$/.test(value) && /[A-Za-z]/.test(value) && /[0-9]/.test(value);
 import { PROJECT, UserError, check, normalizeName, validateDocument, addOrder, orderList, warehouseList, productionTimeline } from './orders.mjs';
 
 export function validateConfig(value, { emulator = false } = {}) {
@@ -17,7 +20,7 @@ export class CloudClient {
     this.session = null; this.generation = 0; this.refreshing = null;
   }
   logout() { this.generation++; this.session = null; this.refreshing = null; }
-  profile() { return this.session ? { account: this.session.account, name: this.session.name } : null; }
+  profile() { return this.session ? { account: this.session.account, name: this.session.name, requiresPasswordChange: this.session.requiresPasswordChange, recoveryEmail: this.session.recoveryEmail ?? '' } : null; }
   async http(url, options = {}) {
     let response;
     try { response = await this.fetch(url, { ...options, signal: AbortSignal.timeout(20_000), redirect: 'error' }); }
@@ -30,24 +33,99 @@ export class CloudClient {
     let value;
     try { value = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')); }
     catch { throw new UserError('Nieprawidłowa sesja. Zaloguj się ponownie.'); }
-    check(value.plant === this.config.plantId && /^(0[1-9]|10)$/.test(value.account) && ['operator', 'laboratory'].includes(value.role), 'To konto nie ma dostępu do zakładu.');
-    return { account: value.account, role: value.role };
+    check(value.plant === this.config.plantId && /^(0[1-9]|1[0-9]|20)$/.test(value.account) && ['operator', 'laboratory'].includes(value.role), 'To konto nie ma dostępu do zakładu.');
+    return { account: value.account, role: value.role, credentialVersion: value.credentialVersion };
   }
-  async login({ account, password, name }) {
+  async login({ account, password, name, email = '' }) {
     this.logout(); const generation = this.generation;
-    check(/^(0[1-9]|10)$/.test(account) && typeof password === 'string' && password.length > 0 && password.length <= 4096, 'Wybierz konto i wpisz hasło.');
-    const { response, data } = await this.http(`${this.authBase}/accounts:signInWithPassword?key=${encodeURIComponent(this.config.apiKey)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `konto${account}@${this.config.projectId}.accounts.invalid`, password, returnSecureToken: true })
-    });
+    check(/^(0[1-9]|1[0-9]|20)$/.test(account) && typeof password === 'string' && password.length > 0 && password.length <= 4096, 'Wybierz konto i wpisz hasło.');
+    const entered = normalizeEmail(email);
+    check(!entered || validEmail(entered), 'Wpisz prawidłowy e-mail przypisany do konta.');
+    const legacy = `konto${account}@${this.config.projectId}.accounts.invalid`;
+    let authEmail = entered || legacy;
+    const attempt = email => this.authRequest('signInWithPassword', { email, password, returnSecureToken: true });
+    let result = await attempt(authEmail);
     check(generation === this.generation, 'Logowanie zostało anulowane.');
+    // Before confirming the change-email link, Firebase still uses the initial address.
+    if (!result.response.ok && authEmail !== legacy && ['INVALID_LOGIN_CREDENTIALS', 'EMAIL_NOT_FOUND', 'INVALID_PASSWORD'].includes(result.data?.error?.message)) {
+      authEmail = legacy; result = await attempt(legacy);
+      check(generation === this.generation, 'Logowanie zostało anulowane.');
+    }
+    const { response, data } = result;
     if (!response.ok) {
       const message = data?.error?.message ?? '';
-      throw new UserError(message.startsWith('TOO_MANY_ATTEMPTS') ? 'Za dużo prób logowania. Spróbuj później.' : 'Nie udało się zalogować. Sprawdź konto i hasło.');
+      throw new UserError(message.startsWith('TOO_MANY_ATTEMPTS') ? 'Za dużo prób logowania. Spróbuj później.' : 'Nie udało się zalogować. Sprawdź login, hasło i przypisany e-mail.');
     }
     const claims = this.claims(data.idToken);
     check(claims.account === account && typeof data.localId === 'string' && data.localId.length > 0 && typeof data.refreshToken === 'string', 'Nieprawidłowa sesja.');
-    this.session = { uid: data.localId, ...claims, token: data.idToken, refresh: data.refreshToken, expires: this.now() + Number(data.expiresIn ?? 3600) * 1000, name: normalizeName(name) };
+    this.session = { uid: data.localId, ...claims, token: data.idToken, refresh: data.refreshToken, expires: this.now() + Number(data.expiresIn ?? 3600) * 1000, name: normalizeName(name), email: authEmail, requiresPasswordChange: false, recoveryEmail: entered };
+    if (claims.credentialVersion === 1) {
+      const saved = await this.privateProfile('GET');
+      check(generation === this.generation, 'Logowanie zostało anulowane.');
+      this.session.requiresPasswordChange = saved?.credentialVersion !== 1 || !(saved?.passwordChangedAt > 0);
+      this.session.recoveryEmail = saved?.recoveryEmail ?? entered;
+    }
     return this.profile();
+  }
+  authRequest(action, body) {
+    return this.http(`${this.authBase}/accounts:${action}?key=${encodeURIComponent(this.config.apiKey)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+  }
+  async privateProfile(method, body) {
+    const session = this.session, generation = this.generation;
+    const token = await this.token();
+    check(session === this.session && generation === this.generation, 'Sesja została zakończona.');
+    const url = new URL(`${this.config.databaseUrl}/accountProfiles/${encodeURIComponent(session.uid)}.json`);
+    if (this.emulator) url.searchParams.set('ns', `${this.config.projectId}-default-rtdb`);
+    url.searchParams.set('auth', token);
+    const { response, data } = await this.http(url, { method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
+    check(session === this.session && generation === this.generation, 'Sesja została zakończona.');
+    check(response.ok, 'Nie udało się zapisać lub pobrać profilu konta. Sprawdź internet i nowe reguły Firebase.');
+    return data;
+  }
+  async resetPassword(email) {
+    const value = normalizeEmail(email);
+    check(validEmail(value), 'Podaj e-mail przypisany do konta.');
+    const { response, data } = await this.authRequest('sendOobCode', { requestType: 'PASSWORD_RESET', email: value });
+    check(response.ok || data?.error?.message === 'EMAIL_NOT_FOUND', 'Nie udało się wysłać linku. Sprawdź internet i spróbuj później.');
+    return { message: 'Jeśli e-mail jest przypisany do konta, otrzymasz link resetowania hasła. Sprawdź także spam.' };
+  }
+  async changePassword({ current, password, email }) {
+    check(this.session, 'Zaloguj się ponownie.');
+    check(validPassword(password) && password !== current, 'Podaj inne hasło: dokładnie 8 liter i cyfr, co najmniej jedna litera i cyfra.');
+    const value = normalizeEmail(email); check(validEmail(value), 'Podaj e-mail do odzyskiwania konta.');
+    check(!this.changingPassword, 'Trwa zmiana hasła.'); this.changingPassword = true;
+    const session = this.session, generation = this.generation;
+    let changed = false, attemptedChange = false;
+    const active = () => check(session === this.session && generation === this.generation, 'Sesja została zakończona.');
+    try {
+      const signed = await this.authRequest('signInWithPassword', { email: session.email, password: current, returnSecureToken: true }); active();
+      check(signed.response.ok && signed.data.localId === session.uid, 'Sprawdź obecne hasło.');
+      attemptedChange = true;
+      const updated = await this.authRequest('update', { idToken: signed.data.idToken, password, returnSecureToken: true });
+      if (!updated.response.ok) attemptedChange = false;
+      changed = updated.response.ok; active();
+      check(updated.response.ok, 'Nie udało się zmienić hasła.');
+      // Reauthenticate with the new password for verify-before-email-change.
+      const fresh = await this.authRequest('signInWithPassword', { email: session.email, password, returnSecureToken: true }); active();
+      check(fresh.response.ok && fresh.data.localId === session.uid, 'Nie udało się odświeżyć sesji.');
+      Object.assign(session, { token: fresh.data.idToken, refresh: fresh.data.refreshToken, expires: this.now() + 3600_000 });
+      const lookup = await this.authRequest('lookup', { idToken: session.token }); active();
+      check(lookup.response.ok && lookup.data.users?.[0]?.localId === session.uid, 'Nie udało się potwierdzić konta.');
+      const alreadyVerified = lookup.data.users[0].email === value && lookup.data.users[0].emailVerified === true;
+      if (!alreadyVerified) {
+        const verification = await this.authRequest('sendOobCode', { requestType: 'VERIFY_AND_CHANGE_EMAIL', idToken: session.token, newEmail: value }); active();
+        check(verification.response.ok, 'Nie udało się wysłać potwierdzenia e-maila. Adres może należeć do innego konta.');
+      }
+      await this.privateProfile('PUT', { credentialVersion: 1, passwordChangedAt: { '.sv': 'timestamp' }, recoveryEmail: value }); active();
+      this.logout();
+      return { email: value, message: alreadyVerified ? 'Hasło zmieniono. Zaloguj się nowym hasłem.' : 'Hasło zmieniono. Otwórz link w wiadomości e-mail, aby powiązać konto i umożliwić reset hasła. Następnie zaloguj się ponownie.' };
+    } catch (error) {
+      if (changed) throw new UserError('Hasło zostało zmienione. Zaloguj się nowym hasłem i ponów przypisanie e-maila.');
+      if (attemptedChange) throw new UserError('Nie udało się potwierdzić zmiany hasła. Spróbuj zalogować się nowym hasłem; w razie potrzeby użyj resetowania przez e-mail.');
+      throw error;
+    } finally { this.changingPassword = false; }
   }
   async token() {
     check(this.session, 'Zaloguj się ponownie.');
@@ -71,6 +149,7 @@ export class CloudClient {
   }
   async database(method = 'GET', body, etag) {
     const generation = this.generation;
+    check(!this.session?.requiresPasswordChange, 'Najpierw zmień hasło początkowe.');
     const token = await this.token(); check(generation === this.generation, 'Sesja została zakończona.');
     const url = new URL(`${this.config.databaseUrl}/plants/${encodeURIComponent(this.config.plantId)}/domains/production.json`);
     if (this.emulator) url.searchParams.set('ns', `${this.config.projectId}-default-rtdb`);

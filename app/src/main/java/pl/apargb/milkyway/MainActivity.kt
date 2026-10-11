@@ -164,6 +164,15 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
         editorTankId = tank.id
         editorMode = mode.name
     }
+    var accountSettingsOpen by remember { mutableStateOf(false) }
+    if (accountSettingsOpen) androidx.compose.ui.window.Dialog(onDismissRequest = { accountSettingsOpen = false }) {
+        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+            CloudPasswordPage(cloud, { current, next, email, done -> session.changePassword(current, next, email) { error ->
+                if (error == null) accountSettingsOpen = false
+                done(error)
+            } }, { accountSettingsOpen = false })
+        }
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -189,6 +198,10 @@ internal fun MilkywayApp(cloud: CloudSessionState, session: CloudSession) {
                     })
                 }
             }, actions = {
+                if (cloud.configured) IconButton(onClick = { accountSettingsOpen = true }, enabled = !saving,
+                    modifier = Modifier.testTag("cloud-password-settings")) {
+                    Icon(Icons.Outlined.Lock, contentDescription = "Zmień hasło")
+                }
                 if (cloud.configured) IconButton(onClick = session::signOut, enabled = !saving, modifier = Modifier.testTag("cloud-sign-out")) {
                     Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = "Wyloguj konto ${cloud.number}")
                 }

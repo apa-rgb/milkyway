@@ -1,3 +1,5 @@
+Bieżący sposób logowania: [20 kont na bezpłatnym planie, zmiana hasła i reset e-mail](20-KONT.md). Starszy bootstrap poniżej służy konfiguracji nowego projektu; istniejący projekt aktualizuj migracją `upgrade-accounts.mjs`.
+
 # Wspólna aplikacja dla 10 operatorów
 
 Android korzysta z **Firebase Authentication** i **Firebase Realtime Database**. Konta mają numery **01–10**, każde z osobnym hasłem. Wszystkie są operatorami, zgodnie z wyborem użytkownika. Nie ma samodzielnej rejestracji. Firebase używa wewnętrznych adresów `konto01@PROJECT.accounts.invalid`; pracownik wybiera tylko numer i wpisuje hasło.

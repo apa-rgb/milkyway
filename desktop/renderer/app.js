@@ -23,26 +23,29 @@ function dateTime(ms) { return new Intl.DateTimeFormat('pl-PL', { timeZone: 'Eur
 function notice(id, message) { $(id).textContent = message || ''; $(id).hidden = !message; }
 function empty(container, message) { const node = document.createElement('div'); node.className = 'empty'; node.textContent = message; container.replaceChildren(node); }
 function busyForm(busy) { $('order-fields').disabled = busy; $('submit-order').textContent = busy ? 'Zapisywanie…' : 'Wyślij zamówienie →'; }
-for (let n = 1; n <= 10; n++) { const option = document.createElement('option'); option.value = String(n).padStart(2, '0'); option.textContent = `Operator ${option.value}`; $('account').append(option); }
+for (let n = 1; n <= 20; n++) { const option = document.createElement('option'); option.value = String(n).padStart(2, '0'); option.textContent = `oper${option.value}`; $('account').append(option); }
 $('warehouse-date').value = currentDay(); $('queue-date').value = day();
-function restoreProfile() { $('name').value = localStorage.getItem(`milkyway-name:${$('account').value}`) ?? ''; }
+function restoreProfile() { $('name').value = localStorage.getItem(`milkyway-name:${$('account').value}`) ?? ''; $('email').value = localStorage.getItem(`milkyway-email:${$('account').value}`) ?? ''; }
 $('account').value = localStorage.getItem('milkyway-account') ?? '01'; restoreProfile(); $('account').addEventListener('change', restoreProfile);
 api.config().then(result => { if (result.ok) { $('version').textContent = `Windows · v${result.value.version}`; if (!result.value.configured) { $('login-error').textContent = result.value.error; $('login-button').disabled = true; } } });
 $('login-form').addEventListener('submit', async event => {
   event.preventDefault(); $('login-button').disabled = true; notice('login-error', '');
-  const result = await api.login({ account: $('account').value, password: $('password').value, name: $('name').value });
+  const result = await api.login({ account: $('account').value, password: $('password').value, name: $('name').value, email: $('email').value });
   $('password').value = ''; $('login-button').disabled = false;
   if (!result.ok) { notice('login-error', result.error); return; }
   profile = result.value; localStorage.setItem('milkyway-account', profile.account); localStorage.setItem(`milkyway-name:${profile.account}`, profile.name);
   $('profile-name').textContent = profile.name || `Operator ${profile.account}`; $('profile-account').textContent = `Konto ${profile.account}`;
+  if ($('email').value.trim()) localStorage.setItem(`milkyway-email:${profile.account}`, $('email').value.trim());
+  if (profile.requiresPasswordChange) { showPassword(); return; }
   $('login-screen').hidden = true; $('app-screen').hidden = false; restoreDraft();
   await refresh(); timer = setInterval(refresh, 5000);
 });
-$('logout').addEventListener('click', async () => {
+async function logoutScreen() {
   clearInterval(timer); viewGeneration++; await api.logout(); profile = null; refreshing = false; latest = { orders: [], warehouse: { products: [], rejects: [] }, timeline: { entries: [] } };
   $('app-screen').hidden = true; $('login-screen').hidden = false; $('orders-list').replaceChildren(); $('warehouse-list').replaceChildren(); $('timeline-grid').replaceChildren(); notice('global-error', ''); notice('success', '');
   $('login-button').disabled = false; $('order-form').reset(); requestID = newID(); selectLine('BUTTER'); selectKind('');
-});
+}
+$('logout').addEventListener('click', logoutScreen);
 function selectLine(value) {
   line = value; document.querySelectorAll('[data-line]').forEach(b => { b.classList.toggle('selected', b.dataset.line === line); b.setAttribute('aria-pressed', String(b.dataset.line === line)); });
   $('butter-options').hidden = line !== 'BUTTER'; $('quantity-label').textContent = line === 'UHT' ? 'Zamówiona ilość [l]' : 'Zamówiona masa [kg]';
@@ -150,3 +153,34 @@ $('queue-line').addEventListener('change', renderTimeline); $('queue-refresh').a
 $('queue-date').addEventListener('change', () => { if ($('queue-date').value) refresh(); });
 for (const [id, offset] of [['queue-previous', -1], ['queue-next', 1]]) $(id).addEventListener('click', () => { $('queue-date').value = changeDay($('queue-date').value || day(), offset); refresh(); });
 $('queue-today').addEventListener('click', () => { $('queue-date').value = day(); refresh(); });
+
+function showPassword() {
+  $('password-form').reset(); notice('password-error', '');
+  $('recovery-email').value = profile?.recoveryEmail || $('email').value;
+  $('password-explanation').textContent = profile?.requiresPasswordChange ? 'Pierwsze logowanie: ustaw własne hasło i e-mail do odzyskiwania dostępu.' : 'Ustaw nowe hasło i e-mail do odzyskiwania dostępu.';
+  $('password-close').textContent = profile?.requiresPasswordChange ? 'Wyloguj' : 'Anuluj';
+  $('password-dialog').showModal();
+}
+$('password-open').addEventListener('click', showPassword);
+$('password-close').addEventListener('click', async () => { $('password-dialog').close(); if (profile?.requiresPasswordChange) await logoutScreen(); });
+$('password-dialog').addEventListener('cancel', event => { if (profile?.requiresPasswordChange) { event.preventDefault(); } });
+$('password-form').addEventListener('submit', async event => {
+  event.preventDefault(); notice('password-error', '');
+  if ($('new-password').value !== $('repeat-password').value) { notice('password-error', 'Powtórzone hasło nie jest takie samo.'); return; }
+  const account = profile.account;
+  for (const el of $('password-form').elements) el.disabled = true;
+  const result = await api.changePassword({ current: $('current-password').value, password: $('new-password').value, email: $('recovery-email').value });
+  for (const el of $('password-form').elements) el.disabled = false;
+  for (const id of ['current-password', 'new-password', 'repeat-password']) $(id).value = '';
+  if (!result.ok) { notice('password-error', result.error); return; }
+  localStorage.setItem(`milkyway-email:${account}`, result.value.email);
+  $('password-dialog').close(); await logoutScreen(); restoreProfile(); notice('login-message', result.value.message);
+});
+$('reset-open').addEventListener('click', () => { $('reset-email').value = $('email').value; notice('reset-message', ''); $('reset-dialog').showModal(); });
+$('reset-close').addEventListener('click', () => $('reset-dialog').close());
+$('reset-form').addEventListener('submit', async event => {
+  event.preventDefault(); $('reset-send').disabled = true; $('reset-close').disabled = true;
+  const result = await api.resetPassword($('reset-email').value);
+  $('reset-send').disabled = false; $('reset-close').disabled = false;
+  notice('reset-message', result.ok ? result.value.message : result.error);
+});

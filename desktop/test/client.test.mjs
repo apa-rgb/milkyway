@@ -43,11 +43,21 @@ test('Missing ETag or stale session never writes', async () => {
 test('Single refresh task is shared by concurrent reads and session tokens remain private', async () => {
   let clock = now; const mock = server(), c = await client(mock, '01', () => clock); clock += 3600_000;
   await Promise.all([c.view('2026-10-11'), c.view('2026-10-11')]); assert.equal(mock.refreshes(), 1);
-  assert.deepEqual(c.profile(), { account: '01', name: 'Anna' });
+  assert.deepEqual(c.profile(), { account: '01', name: 'Anna', requiresPasswordChange: false, recoveryEmail: '' });
 });
 test('Order number survives Android progress updates and appears in desktop warehouse', async () => {
   const mock = server(), c = await client(mock); await c.submit(input(1));
   const state = mock.state(), row = state.tables.production_queue[sharedKey(input(1).id)]; row.pending_order = 0; row.produced_amount = '100';
   state.tables.production_completions = { [sharedKey('receipt')]: { id: 'receipt', entry_id: row.id, _rowid: 1, amount: '100', produced_on: '2026-10-11' } };
   const view = await c.view('2026-10-11'); assert.equal(view.orders[0].status, 'COMPLETED'); assert.equal(view.warehouse.products[0].orderNumber, 1);
+});
+
+test('Loss of the password-change acknowledgement reports uncertainty and never saves a plaintext password', async () => {
+  const mock = server(), c = await client(mock); const original = c.fetch;
+  c.fetch = async (url, options) => {
+    if (String(url).includes('accounts:update')) throw new Error('Lost acknowledgement after changing password');
+    return original(url, options);
+  };
+  await assert.rejects(c.changePassword({ current: 'fixture-password', password: 'Chosen88', email: 'anna@example.com' }), /potwierdzić zmiany hasła/);
+  assert(!JSON.stringify(c.profile()).includes('Chosen88'));
 });

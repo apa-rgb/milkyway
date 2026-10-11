@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.database.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,16 +13,20 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 
-internal val operatorNumbers = (1..10).map { "%02d".format(java.util.Locale.ROOT, it) }
+internal val operatorNumbers = (1..20).map { "%02d".format(java.util.Locale.ROOT, it) }
+internal fun operatorLogin(number: String) = "oper$number"
+internal fun validNewPassword(value: String) = value.matches(Regex("[A-Za-z0-9]{8}")) && value.any(Char::isLetter) && value.any(Char::isDigit)
+internal fun validRecoveryEmail(value: String) = value.length <= 254 && value.matches(Regex("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) && !value.endsWith(".accounts.invalid", true)
 internal fun operatorEmail(number: String, project: String): String {
-    require(number in operatorNumbers) { "Wybierz konto od 01 do 10." }
+    require(number in operatorNumbers) { "Wybierz konto od oper01 do oper20." }
     require(project.matches(Regex("[a-z][a-z0-9-]{4,62}"))) { "Nieprawidłowy projekt Firebase." }
     return "konto$number@$project.accounts.invalid"
 }
 
 internal data class CloudSessionState(val configured: Boolean = false, val checking: Boolean = false,
     val uid: String? = null, val number: String? = null, val laboratory: Boolean = false, val connected: Boolean = false,
-    val ready: Boolean = false, val revision: Long = 0, val error: String? = null, val displayName: String? = null)
+    val ready: Boolean = false, val revision: Long = 0, val error: String? = null, val displayName: String? = null,
+    val requiresPasswordChange: Boolean = false, val message: String? = null, val recoveryEmail: String? = null)
 
 /** One authenticated session. Never mix private device data into a shared plant automatically. */
 internal class CloudSession private constructor(private val context: Context) {
@@ -35,6 +40,10 @@ internal class CloudSession private constructor(private val context: Context) {
     private var loginError: String? = null
     private val profile = OperatorProfile(context)
     private var pendingLoginName: Pair<String, String>? = null
+    private var pendingLoginEmail: String? = null
+    private var accountMessage: String? = null
+    private val emails = context.getSharedPreferences("account_emails", Context.MODE_PRIVATE)
+    fun savedEmail(number: String) = emails.getString("${BuildConfig.FIREBASE_PROJECT_ID}:$number", "").orEmpty()
     private val app: FirebaseApp? = if (configured) FirebaseApp.initializeApp(context, FirebaseOptions.Builder()
         .setProjectId(BuildConfig.FIREBASE_PROJECT_ID).setApiKey(BuildConfig.FIREBASE_API_KEY)
         .setApplicationId(BuildConfig.FIREBASE_APP_ID).setDatabaseUrl(BuildConfig.FIREBASE_DATABASE_URL).build(), "milkyway") else null
@@ -46,7 +55,7 @@ internal class CloudSession private constructor(private val context: Context) {
             detach()
             val user = firebase.currentUser
             if (user == null) ReminderScheduler.clear(context)
-            mutableState.value = CloudSessionState(configured = configured, checking = user != null, error = loginError)
+            mutableState.value = CloudSessionState(configured = configured, checking = user != null, error = loginError, message = accountMessage)
             user?.let(::verifyUser)
         }
     }
@@ -64,36 +73,113 @@ internal class CloudSession private constructor(private val context: Context) {
             val number = claims["account"] as? String
             val plant = claims["plant"] as? String
             val role = claims["role"] as? String
-            if (number !in operatorNumbers || plant != BuildConfig.FIREBASE_PLANT_ID || role !in listOf("operator", "laboratory")) {
+            if (number !in operatorNumbers || plant != BuildConfig.FIREBASE_PLANT_ID || role !in listOf("operator", "laboratory") || pendingLoginName?.first?.let { it != number } == true) {
                 loginError = "To konto nie ma dostępu do tego zakładu."
                 auth?.signOut()
                 mutableState.value = mutableState.value.copy(checking = false, error = "To konto nie ma dostępu do tego zakładu.")
             } else {
-                pendingLoginName?.takeIf { it.first == user.email }?.let { profile.save(user.uid, it.second) }
+                pendingLoginName?.let { profile.save(user.uid, it.second) }
+                pendingLoginEmail?.takeIf { it.isNotBlank() }?.let { emails.edit().putString("${BuildConfig.FIREBASE_PROJECT_ID}:$number", it).apply() }
                 pendingLoginName = null
+                pendingLoginEmail = null
                 mutableState.value = mutableState.value.copy(uid = user.uid, number = number, laboratory = role == "laboratory",
                     displayName = profile.name(user.uid).takeIf { it.isNotBlank() })
-                attach(user.uid)
+                if ((claims["credentialVersion"] as? Number)?.toInt() == 1) {
+                    database!!.getReference("accountProfiles/${user.uid}").get().addOnCompleteListener { profileTask ->
+                        if (auth?.currentUser?.uid != user.uid || generation != listenerGeneration) return@addOnCompleteListener
+                        if (!profileTask.isSuccessful) {
+                            mutableState.value = mutableState.value.copy(checking = false, error = "Nie udało się pobrać profilu konta. Sprawdź internet i nowe reguły Firebase.")
+                        } else {
+                            val changed = profileTask.result.child("passwordChangedAt").getValue(Long::class.java) ?: 0L
+                            val needsChange = changed <= 0 || profileTask.result.child("credentialVersion").getValue(Long::class.java) != 1L
+                            mutableState.value = mutableState.value.copy(requiresPasswordChange = needsChange, recoveryEmail = profileTask.result.child("recoveryEmail").getValue(String::class.java))
+                            if (needsChange) mutableState.value = mutableState.value.copy(checking = false) else attach(user.uid)
+                        }
+                    }
+                } else attach(user.uid)
             }
         }
     }
 
-    fun signIn(number: String, password: String, name: String) {
+    fun signIn(number: String, password: String, name: String, recoveryEmail: String = "") {
         val auth = auth ?: return
         if (mutableState.value.checking) return
         if (password.isBlank()) { mutableState.value = mutableState.value.copy(error = "Wpisz hasło."); return }
-        loginError = null
-        val email = operatorEmail(number, BuildConfig.FIREBASE_PROJECT_ID)
-        pendingLoginName = email to normalizeOperatorName(name)
+        val entered = recoveryEmail.trim().lowercase(java.util.Locale.ROOT)
+        if (entered.isNotBlank() && !validRecoveryEmail(entered)) { mutableState.value = mutableState.value.copy(error = "Wpisz prawidłowy e-mail."); return }
+        loginError = null; accountMessage = null
+        val legacy = operatorEmail(number, BuildConfig.FIREBASE_PROJECT_ID)
+        val email = entered.ifBlank { savedEmail(number) }.ifBlank { legacy }
+        pendingLoginName = number to normalizeOperatorName(name)
+        pendingLoginEmail = email.takeIf { it != legacy }
         mutableState.value = mutableState.value.copy(checking = true, error = null)
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnFailureListener {
+        fun failed() {
                 pendingLoginName = null
+                pendingLoginEmail = null
                 mutableState.value = mutableState.value.copy(checking = false, error = "Nie udało się zalogować. Sprawdź hasło i połączenie.")
-            }
+        }
+        auth.signInWithEmailAndPassword(email, password).addOnFailureListener { error ->
+            val code = (error as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
+            if (email != legacy && code in listOf("ERROR_INVALID_CREDENTIAL", "ERROR_INVALID_LOGIN_CREDENTIALS", "ERROR_USER_NOT_FOUND", "ERROR_WRONG_PASSWORD")) {
+                auth.signInWithEmailAndPassword(legacy, password).addOnFailureListener { failed() }
+            } else failed()
+        }
     }
 
-    fun signOut() { loginError = null; pendingLoginName = null; ReminderScheduler.clear(context); auth?.signOut() }
+    fun resetPassword(email: String, result: (String) -> Unit) {
+        val value = email.trim().lowercase(java.util.Locale.ROOT)
+        if (!validRecoveryEmail(value)) { result("Wpisz prawidłowy e-mail przypisany do konta."); return }
+        auth?.sendPasswordResetEmail(value)?.addOnCompleteListener {
+            // Never disclose whether another person's e-mail is registered.
+            result(if (it.isSuccessful || (it.exception as? com.google.firebase.auth.FirebaseAuthException)?.errorCode == "ERROR_USER_NOT_FOUND")
+                "Jeśli e-mail jest przypisany do konta, otrzymasz link resetowania hasła. Sprawdź także spam."
+            else "Nie udało się wysłać wiadomości. Sprawdź internet i spróbuj później.")
+        }
+    }
+
+    fun changePassword(current: String, next: String, email: String, result: (String?) -> Unit) {
+        val user = auth?.currentUser ?: return result("Zaloguj się ponownie.")
+        val value = email.trim().lowercase(java.util.Locale.ROOT)
+        if (!validNewPassword(next) || !validRecoveryEmail(value)) return result("Hasło: dokładnie 8 liter i cyfr, z co najmniej jedną literą i cyfrą. Podaj prawidłowy e-mail.")
+        if (next == current) return result("Nowe hasło musi być inne niż dotychczasowe.")
+        val number = state.value.number ?: return result("Nie udało się potwierdzić konta.")
+        var changed = false
+        var attemptedChange = false
+        fun failed() = result(when {
+            changed -> "Hasło zostało zmienione. Zaloguj się nowym hasłem i ponów przypisanie e-maila."
+            attemptedChange -> "Zmiana hasła nie została potwierdzona. Spróbuj zalogować się nowym hasłem; w razie potrzeby użyj resetowania przez e-mail."
+            else -> "Nie udało się zmienić hasła. Sprawdź obecne hasło i internet."
+        })
+        fun sameUser() = auth.currentUser?.uid == user.uid
+        val currentEmail = user.email ?: return result("Brak adresu konta.")
+        user.reauthenticate(EmailAuthProvider.getCredential(currentEmail, current)).addOnCompleteListener { checked ->
+            if (!checked.isSuccessful || !sameUser()) { failed(); return@addOnCompleteListener }
+            attemptedChange = true
+            user.updatePassword(next).addOnCompleteListener { updated ->
+                if (!updated.isSuccessful || !sameUser()) { failed(); return@addOnCompleteListener }
+                changed = true
+                user.reauthenticate(EmailAuthProvider.getCredential(currentEmail, next)).addOnCompleteListener { fresh ->
+                    if (!fresh.isSuccessful || !sameUser()) { failed(); return@addOnCompleteListener }
+                    val send = if (currentEmail.equals(value, true) && user.isEmailVerified) com.google.android.gms.tasks.Tasks.forResult<Void>(null)
+                        else user.verifyBeforeUpdateEmail(value)
+                    send.addOnCompleteListener { verified ->
+                        if (!verified.isSuccessful || !sameUser()) { failed(); return@addOnCompleteListener }
+                        val data = mapOf("credentialVersion" to 1, "passwordChangedAt" to ServerValue.TIMESTAMP, "recoveryEmail" to value)
+                        database!!.getReference("accountProfiles/${user.uid}").setValue(data).addOnCompleteListener { saved ->
+                            if (!saved.isSuccessful || !sameUser()) { failed(); return@addOnCompleteListener }
+                            emails.edit().putString("${BuildConfig.FIREBASE_PROJECT_ID}:$number", value).apply()
+                            accountMessage = if (currentEmail.equals(value, true) && user.isEmailVerified) "Hasło zmieniono. Zaloguj się nowym hasłem."
+                                else "Hasło zmieniono. Otwórz link w wiadomości e-mail, aby powiązać konto i umożliwić reset hasła. Następnie zaloguj się ponownie."
+                            loginError = null; pendingLoginName = null; pendingLoginEmail = null
+                            auth.signOut(); result(null)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun signOut() { loginError = null; accountMessage = null; pendingLoginName = null; pendingLoginEmail = null; ReminderScheduler.clear(context); auth?.signOut() }
     fun retry() {
         auth?.currentUser?.let { user ->
             detach()

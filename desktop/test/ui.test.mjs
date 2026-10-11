@@ -11,16 +11,24 @@ import { sharedKey } from '../src/orders.mjs';
 const directory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const waitFor = async (page, predicate) => page.waitForFunction(predicate, null, { timeout: 15000 });
 test('Desktop login, pending order, partial warehouse and live calendar timeline work through the isolated Electron bridge', { timeout: 90000 }, async () => {
-  let document = null, revision = 0, writes = 0;
-  const token = 'e30.' + Buffer.from(JSON.stringify({ plant: 'default', account: '01', role: 'operator' })).toString('base64url') + '.test';
+  let document = null, revision = 0, writes = 0, privateProfile = null, loginPassword = 'local-test-password';
+  const token = 'e30.' + Buffer.from(JSON.stringify({ plant: 'default', account: '01', role: 'operator', credentialVersion: 1 })).toString('base64url') + '.test';
   const auth = createServer(async (req, res) => {
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     const body = JSON.parse(Buffer.concat(chunks).toString());
-    assert.equal(body.email, 'konto01@demo-milkyway.accounts.invalid');
-    res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ localId: 'operator01', idToken: token, refreshToken: 'local-only-refresh', expiresIn: '3600' }));
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url.includes('accounts:sendOobCode')) { assert(['PASSWORD_RESET', 'VERIFY_AND_CHANGE_EMAIL'].includes(body.requestType)); res.end('{}'); return; }
+    if (req.url.includes('accounts:lookup')) { res.end(JSON.stringify({ users: [{ localId: 'operator01', email: 'konto01@demo-milkyway.accounts.invalid', emailVerified: false }] })); return; }
+    if (req.url.includes('accounts:update')) { loginPassword = body.password; }
+    else { assert(['konto01@demo-milkyway.accounts.invalid', 'anna@example.com'].includes(body.email)); assert.equal(body.password, loginPassword); }
+    res.end(JSON.stringify({ localId: 'operator01', idToken: token, refreshToken: 'local-only-refresh', expiresIn: '3600' }));
   });
   const database = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
+    if (req.url.startsWith('/accountProfiles/')) {
+      if (req.method === 'PUT') { const chunks = []; for await (const chunk of req) chunks.push(chunk); privateProfile = JSON.parse(Buffer.concat(chunks).toString()); privateProfile.passwordChangedAt = Date.now(); }
+      res.end(JSON.stringify(privateProfile)); return;
+    }
     if (req.method === 'PUT') {
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       if (req.headers['if-match'] !== `"${revision}"`) { res.statusCode = 412; res.end(JSON.stringify(document)); return; }
@@ -37,7 +45,18 @@ test('Desktop login, pending order, partial warehouse and live calendar timeline
     await page.locator('#password').fill('local-test-password'); await page.locator('#name').fill('Anna');
     await mkdir(path.join(directory, 'test-results'), { recursive: true });
     await page.screenshot({ path: path.join(directory, 'test-results/login.png') });
-    await page.locator('#login-button').click(); await waitFor(page, () => !document.getElementById('app-screen').hidden);
+    await page.locator('#reset-open').click(); await page.locator('#reset-email').fill('anna@example.com'); await page.locator('#reset-send').click();
+    await waitFor(page, () => document.getElementById('reset-message').textContent.includes('Jeśli e-mail')); await page.locator('#reset-close').click();
+    await page.locator('#login-button').click(); await waitFor(page, () => document.getElementById('password-dialog').open);
+    assert.equal(await page.locator('#app-screen').isVisible(), false);
+    await page.locator('#current-password').fill('local-test-password'); await page.locator('#new-password').fill('Chosen88');
+    await page.locator('#repeat-password').fill('Wrong888'); await page.locator('#recovery-email').fill('anna@example.com'); await page.locator('#password-save').click();
+    await waitFor(page, () => document.getElementById('password-error').textContent.includes('nie jest takie samo'));
+    await page.locator('#repeat-password').fill('Chosen88'); await page.locator('#password-save').click();
+    await waitFor(page, () => document.getElementById('login-message').textContent.includes('Hasło zmieniono'));
+    assert.equal(privateProfile.recoveryEmail, 'anna@example.com'); assert(!JSON.stringify(privateProfile).includes('Chosen88'));
+    assert.equal(await page.locator('#email').inputValue(), 'anna@example.com');
+    await page.locator('#password').fill('Chosen88'); await page.locator('#login-button').click(); await waitFor(page, () => !document.getElementById('app-screen').hidden);
     assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.process), 'undefined');
     await page.locator('#product').fill('Mix 60%'); await page.locator('#quantity').fill('1500,5'); await page.locator('#submit-order').click();
@@ -71,7 +90,7 @@ test('Desktop login, pending order, partial warehouse and live calendar timeline
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     await page.locator('#logout').click(); await waitFor(page, () => !document.getElementById('login-screen').hidden);
     assert.equal(await page.locator('#password').inputValue(), '');
-    assert.equal(await page.evaluate(() => Object.values(localStorage).some(v => v.includes('local-test-password') || v.includes('local-only-refresh'))), false);
+    assert.equal(await page.evaluate(() => Object.values(localStorage).some(v => v.includes('local-test-password') || v.includes('Chosen88') || v.includes('local-only-refresh'))), false);
   } finally {
     await application?.close(); await Promise.all([new Promise(resolve => auth.close(resolve)), new Promise(resolve => database.close(resolve))]);
     await rm(userData, { recursive: true, force: true });

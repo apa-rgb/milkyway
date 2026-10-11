@@ -2,12 +2,23 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "accountProfiles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && auth.token.account.matches(/^(0[1-9]|1[0-9]|20)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory')",
+        ".write": "auth != null && auth.uid == $uid && auth.token.account.matches(/^(0[1-9]|1[0-9]|20)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory') && newData.exists()",
+        ".validate": "newData.hasChildren(['credentialVersion', 'passwordChangedAt', 'recoveryEmail'])",
+        "credentialVersion": { ".validate": "newData.val() == 1" },
+        "passwordChangedAt": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now" },
+        "recoveryEmail": { ".validate": "newData.isString() && newData.val().length <= 254" },
+        "$other": { ".validate": false }
+      }
+    },
     "plants": {
       "$plant": {
         "domains": {
           "$domain": {
-            ".read": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|10)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory')",
-            ".write": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|10)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory') && ($domain == 'inventory' || $domain == 'production' || $domain == 'notes') && newData.exists() && newData.child('actor/uid').val() == auth.uid && newData.child('actor/account').val() == auth.token.account",
+            ".read": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|1[0-9]|20)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory')",
+            ".write": "auth != null && auth.token.plant == $plant && auth.token.account.matches(/^(0[1-9]|1[0-9]|20)$/) && (auth.token.role == 'operator' || auth.token.role == 'laboratory') && ($domain == 'inventory' || $domain == 'production' || $domain == 'notes') && newData.exists() && newData.child('actor/uid').val() == auth.uid && newData.child('actor/account').val() == auth.token.account",
             ".validate": "(($domain == 'production' && newData.child('schema').val() == 3) || ($domain != 'production' && newData.child('schema').val() == 1)) && newData.child('revision').isNumber() && newData.child('updatedAt').isNumber() && (!data.child('orderSequence').exists() || (newData.child('orderSequence').exists() && newData.child('orderSequence').val() >= data.child('orderSequence').val())) && (!newData.child('orderSequence').exists() || (newData.child('orderSequence').isNumber() && newData.child('orderSequence').val() >= 0 && newData.child('orderSequence').val() <= 9007199254740991))",
             "tables": {
               "tank_states": {
